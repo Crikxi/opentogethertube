@@ -96,7 +96,7 @@ export default {
 				playerVars: {
 					autoplay: 0,
 					enablejsapi: 1,
-					controls: 0,
+					controls: 1,
 					disablekb: 1,
 					// required for iOS
 					playsinline: 1,
