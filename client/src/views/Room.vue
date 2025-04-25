@@ -804,10 +804,12 @@ $in-video-chat-width-small: 250px;
 	pointer-events: none;
 }
 
+.out-video-chat:has(.activated) {
+	width: $in-video-chat-width;
+}
+	
 .out-video-chat {
 	padding: 5px 10px;
-
-	width: $in-video-chat-width;
 	height: 300px;
 	min-height: 100px;
 	@media screen and (max-width: $sm-max) {
