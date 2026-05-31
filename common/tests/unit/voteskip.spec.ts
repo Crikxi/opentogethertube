@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Grants, parseIntoGrantMask } from "../../permissions";
-import { PlayerStatus, Role, RoomUserInfo } from "../../models/types";
-import { voteSkipThreshold, countEligibleVoters } from "../../voteskip";
+import { Grants, parseIntoGrantMask } from "../../permissions.js";
+import { PlayerStatus, Role, type RoomUserInfo } from "../../models/types.js";
+import { voteSkipThreshold, countEligibleVoters } from "../../voteskip.js";
 
 describe("voteskip", () => {
 	it.each([
@@ -21,12 +21,9 @@ describe("voteskip", () => {
 		[14, 7],
 		[15, 8],
 		[16, 8],
-	])(
-		"should give a reasonable threshold for %s users",
-		(users: number, expectedThresh: number) => {
-			expect(voteSkipThreshold(users)).toBe(expectedThresh);
-		}
-	);
+	])("should give a reasonable threshold for %s users", (users: number, expectedThresh: number) => {
+		expect(voteSkipThreshold(users)).toBe(expectedThresh);
+	});
 
 	it("should count eligible voters", () => {
 		const users: RoomUserInfo[] = [

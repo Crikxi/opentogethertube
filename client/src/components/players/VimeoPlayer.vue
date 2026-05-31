@@ -8,6 +8,7 @@ import vimeo from "@vimeo/player";
 import { onBeforeUnmount } from "vue";
 import "./iframe-bg-hack.scss";
 
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
 const VimeoPlayer = defineComponent({
 	name: "VimeoPlayer",
 	props: {
@@ -15,16 +16,16 @@ const VimeoPlayer = defineComponent({
 	},
 	emits: ["playing", "paused", "ready", "buffering", "error", "apiready"],
 	setup(props, { emit }) {
-		let player: vimeo | undefined = undefined;
+		let player: vimeo | undefined;
 		let isBuffering = false;
-		let resizeObserver: ResizeObserver | undefined = undefined;
+		let resizeObserver: ResizeObserver | undefined;
 
 		onMounted(async () => {
 			const container = document.getElementById("vimeo-player");
 			if (!container) {
 				return;
 			}
-			const parsedId = parseInt(props.videoId);
+			const parsedId = parseInt(props.videoId, 10);
 			player = new vimeo(container, {
 				id: parsedId,
 				controls: false,
@@ -60,7 +61,7 @@ const VimeoPlayer = defineComponent({
 			if (!player) {
 				return;
 			}
-			const parsedId = parseInt(props.videoId);
+			const parsedId = parseInt(props.videoId, 10);
 			player.loadVideo(parsedId);
 		});
 
@@ -120,6 +121,10 @@ const VimeoPlayer = defineComponent({
 			return false;
 		}
 
+		function isQualitySupported(): boolean {
+			return false;
+		}
+
 		function getAvailablePlaybackRates(): number[] {
 			return [1];
 		}
@@ -133,10 +138,12 @@ const VimeoPlayer = defineComponent({
 			setPosition,
 			setVolume,
 			isCaptionsSupported,
+			isQualitySupported,
 			getAvailablePlaybackRates,
 		};
 	},
 });
 
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
 export default VimeoPlayer;
 </script>

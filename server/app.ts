@@ -1,27 +1,27 @@
 import express from "express";
-import http from "http";
-import fs from "fs";
-import { getLogger, setLogLevel } from "./logger";
+import http from "node:http";
+import fs from "node:fs";
+import { getLogger, setLogLevel } from "./logger.js";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as DiscordStrategy } from "passport-discord";
 import { Strategy as BearerStrategy } from "passport-http-bearer";
-import { metricsMiddleware } from "./metrics";
-import { loadModels, sequelize } from "./models";
-import { buildApiRouter } from "./api";
-import { buildClients, redisClient, registerRedisMetrics } from "./redisclient";
-import usermanager from "./usermanager";
-import tokens from "./auth/tokens";
-import websockets from "./websockets";
-import clientmanager from "./clientmanager";
-import roommanager from "./roommanager";
+import { metricsMiddleware } from "./metrics.js";
+import { loadModels, sequelize } from "./models/index.js";
+import { buildApiRouter } from "./api.js";
+import { buildClients, redisClient, registerRedisMetrics } from "./redisclient.js";
+import usermanager from "./usermanager.js";
+import tokens from "./auth/tokens.js";
+import websockets from "./websockets.js";
+import clientmanager from "./clientmanager.js";
+import roommanager from "./roommanager.js";
 import bodyParser from "body-parser";
-import { loadConfigFile, conf, setLogger, validateConfig } from "./ott-config";
-import { buildRateLimiter } from "./rate-limit";
-import { initExtractor } from "./infoextractor";
-import session, { SessionOptions } from "express-session";
+import { loadConfigFile, conf, setLogger, validateConfig } from "./ott-config.js";
+import { buildRateLimiter } from "./rate-limit.js";
+import { initExtractor } from "./infoextractor.js";
+import session, { type SessionOptions } from "express-session";
 import RedisStore from "connect-redis";
-import { setupPostgresMetricsCollection } from "./storage.metrics";
+import { setupPostgresMetricsCollection } from "./storage.metrics.js";
 import cookieparser from "cookie-parser";
 
 const app = express();
@@ -33,7 +33,7 @@ export async function main() {
 	loadConfigFile();
 	setLogLevel(conf.get("log.level"));
 	if (process.argv.includes("--validate")) {
-		let result = validateConfig();
+		const result = validateConfig();
 		if (!result.ok) {
 			log.error("Config validation failed:");
 			log.error(result.value.message);
@@ -48,10 +48,10 @@ export async function main() {
 	const heroku = conf.get("heroku");
 	const docker = conf.get("docker");
 	const dbmode = conf.get("db.mode");
-	log.info("Environment: " + env);
-	log.info("Is Heroku? " + heroku);
-	log.info("Is Docker? " + docker);
-	log.info("Database mode: " + dbmode);
+	log.info(`Environment: ${env}`);
+	log.info(`Is Heroku? ${heroku}`);
+	log.info(`Is Docker? ${docker}`);
+	log.info(`Database mode: ${dbmode}`);
 
 	const searchEnabled = conf.get("add_preview.search.enabled");
 	log.info(`Search enabled: ${searchEnabled}`);
@@ -83,9 +83,9 @@ export async function main() {
 	const server = http.createServer(app);
 	async function checkRedis() {
 		if (performance) {
-			let start = performance.now();
+			const start = performance.now();
 			await redisClient.ping();
-			let duration = performance.now() - start;
+			const duration = performance.now() - start;
 			log.info(`Latency to redis: ${duration}ms`);
 		}
 	}
@@ -107,14 +107,15 @@ export async function main() {
 	};
 	if (
 		conf.get("env") === "production" &&
+		// biome-ignore lint/complexity/noExtraBooleanCast: biome migration
 		!!conf.get("hostname") &&
 		!conf.get("hostname").includes("localhost") &&
 		conf.get("trust_proxy") > 0
 	) {
 		log.warn(
 			`Trusting ${conf.get(
-				"trust_proxy"
-			)} layers of reverse proxy, X-Forwarded-* headers will be trusted.`
+				"trust_proxy",
+			)} layers of reverse proxy, X-Forwarded-* headers will be trusted.`,
 		);
 		app.set("trust proxy", conf.get("trust_proxy"));
 		// @ts-expect-error
@@ -135,7 +136,7 @@ export async function main() {
 				maxAge: "1 year",
 				redirect: false,
 				index: false,
-			})
+			}),
 		);
 	} else {
 		log.warn("no dist folder found");
@@ -157,20 +158,20 @@ export async function main() {
 				scope: ["identify"],
 				passReqToCallback: true,
 			},
-			usermanager.authCallbackDiscord
-		)
+			usermanager.authCallbackDiscord,
+		),
 	);
 	passport.use(
 		new BearerStrategy(async (token, done) => {
 			if (!(await tokens.validate(token))) {
 				return done(null, false);
 			}
-			let ottsession = await tokens.getSessionInfo(token);
+			const ottsession = await tokens.getSessionInfo(token);
 			if (ottsession.isLoggedIn) {
 				return done(null, ottsession);
 			}
 			return done(null, false);
-		})
+		}),
 	);
 	passport.serializeUser(usermanager.serializeUser);
 	passport.deserializeUser(usermanager.deserializeUser);
@@ -186,7 +187,7 @@ export async function main() {
 		bodyParser.urlencoded({
 			// to support URL-encoded bodies
 			extended: true,
-		})
+		}),
 	);
 
 	app.use((req, res, next) => {
@@ -218,7 +219,7 @@ export async function main() {
 		log.warn("no dist folder found, run `yarn build` to build the client");
 		app.get("*", (req, res) => {
 			res.status(404).send(
-				"File not found - Client files not found. Run `yarn build` to build the client."
+				"File not found - Client files not found. Run `yarn build` to build the client.",
 			);
 		});
 	}
@@ -228,7 +229,7 @@ export async function main() {
 	//start our server
 	if (conf.get("env") !== "test") {
 		server.listen(conf.get("port"), () => {
-			let addr = server.address();
+			const addr = server.address();
 			if (!addr) {
 				log.error("Failed to start server!");
 				process.exit(1);

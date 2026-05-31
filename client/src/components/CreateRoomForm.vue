@@ -16,8 +16,8 @@
 				<v-checkbox
 					v-model="showSettings"
 					:label="$t('room.tabs.settings')"
-					false-icon="mdi-chevron-up"
-					true-icon="mdi-chevron-down"
+					:false-icon="mdiChevronUp"
+					:true-icon="mdiChevronDown"
 				/>
 				<v-expand-transition>
 					<div v-if="showSettings">
@@ -78,7 +78,8 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, reactive, Ref, ref, watch } from "vue";
+import { mdiChevronUp, mdiChevronDown } from "@mdi/js";
+import { onMounted, reactive, type Ref, ref, watch } from "vue";
 import { createRoomHelper } from "@/util/roomcreator";
 import { ROOM_NAME_REGEX } from "ott-common/constants";
 import { Visibility, QueueMode } from "ott-common/models/types";
@@ -121,7 +122,7 @@ const rules = {
 		(v: string) =>
 			(v &&
 				[QueueMode.Manual, QueueMode.Vote, QueueMode.Loop, QueueMode.Dj].includes(
-					v as QueueMode
+					v as QueueMode,
 				)) ||
 			t("create-room-form.rules.invalid-queue"),
 	],

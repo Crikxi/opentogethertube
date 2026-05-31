@@ -1,14 +1,15 @@
-import { getLogger } from "../logger";
+import { getLogger } from "../logger.js";
 import express from "express";
-import tokens, { SessionInfo } from "./tokens";
+import tokens, { type SessionInfo } from "./tokens.js";
 import { uniqueNamesGenerator } from "unique-names-generator";
 import passport from "passport";
-import { AuthToken, MySession } from "ott-common/models/types";
+import type { AuthToken, MySession } from "ott-common/models/types.js";
 import nocache from "nocache";
-import usermanager from "../usermanager";
-import { OttException } from "ott-common/exceptions";
-import { requireApiKey } from "../admin";
-import { conf } from "../ott-config";
+import usermanager from "../usermanager.js";
+import { requireApiKey } from "../admin.js";
+import { conf } from "../ott-config.js";
+
+export type { SessionInfo } from "./tokens.js";
 
 const router = express.Router();
 router.use(nocache());
@@ -24,9 +25,9 @@ function createSession(): SessionInfo {
 export async function authTokenMiddleware(
 	req: express.Request,
 	res: express.Response,
-	next: express.NextFunction
+	next: express.NextFunction,
 ): Promise<void> {
-	let apikey = req.get("apikey");
+	const apikey = req.get("apikey");
 	if (apikey) {
 		log.silly("API key was provided for auth");
 		try {
@@ -51,7 +52,7 @@ export async function authTokenMiddleware(
 		return;
 	}
 	log.silly("validating auth token");
-	if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+	if (req.headers.authorization?.startsWith("Bearer")) {
 		const token: AuthToken = req.headers.authorization.split(" ")[1];
 		req.token = token;
 	} else if (req.cookies?.token) {
@@ -84,7 +85,7 @@ export async function authTokenMiddleware(
 		});
 		return;
 	}
-	if (req.ottsession && req.ottsession.isLoggedIn) {
+	if (req.ottsession?.isLoggedIn) {
 		try {
 			req.user = await usermanager.getUser({ id: req.ottsession.user_id });
 		} catch (err) {
@@ -136,7 +137,7 @@ router.get(
 		(req.session as MySession).postLoginRedirect = req.query.redirect ?? "/";
 		next();
 	},
-	passport.authenticate("discord", { keepSessionInfo: true })
+	passport.authenticate("discord", { keepSessionInfo: true }),
 );
 router.get(
 	"/discord/callback",
@@ -175,7 +176,7 @@ router.get(
 		log.debug(`redirecting to ${redirect}`);
 		res.redirect(redirect); // Successful auth
 		delete (req.session as MySession).postLoginRedirect;
-	}
+	},
 );
 
 export default {

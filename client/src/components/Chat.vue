@@ -13,7 +13,7 @@
 				data-cy="chat-deactivate"
 				aria-label="close chat"
 			>
-				<v-icon>mdi-chevron-down</v-icon>
+				<v-icon :icon="mdiChevronDown" />
 			</v-btn>
 			<h4>{{ $t("chat.title") }}</h4>
 		</div>
@@ -37,7 +37,7 @@
 		</div>
 		<div v-if="!stickToBottom" class="to-bottom">
 			<v-btn size="x-small" icon @click="forceToBottom">
-				<v-icon>mdi-chevron-double-down</v-icon>
+				<v-icon :icon="mdiChevronDoubleDown" />
 			</v-btn>
 		</div>
 		<Transition name="input" @after-enter="enforceStickToBottom">
@@ -66,13 +66,14 @@
 				data-cy="chat-activate"
 				aria-label="open chat"
 			>
-				<v-icon>mdi-comment-outline</v-icon>
+				<v-icon :icon="mdiCommentOutline" />
 			</v-btn>
 		</div>
 	</div>
 </template>
 
 <script lang="ts" setup>
+import { mdiChevronDown, mdiChevronDoubleDown, mdiCommentOutline } from "@mdi/js";
 import { onUpdated, ref, type Ref, nextTick, onMounted, onUnmounted } from "vue";
 import type { ChatMessage } from "ott-common/models/types";
 import { useConnection } from "@/plugins/connection";
@@ -163,6 +164,9 @@ function expireChatMessage() {
  */
 function enforceStickToBottom() {
 	const div = messages.value as HTMLDivElement;
+	if (!div) {
+		return;
+	}
 	if (stickToBottom.value) {
 		div.scrollTop = div.scrollHeight;
 	}
@@ -185,6 +189,9 @@ function onInputKeyDown(e: KeyboardEvent): void {
 
 function onScroll() {
 	const div = messages.value as HTMLDivElement;
+	if (!div) {
+		return;
+	}
 	const distToBottom = div.scrollHeight - div.clientHeight - div.scrollTop;
 	stickToBottom.value = distToBottom === 0;
 }
@@ -198,10 +205,6 @@ onUpdated(enforceStickToBottom);
 </script>
 
 <style lang="scss" scoped>
-@import "../variables.scss";
-
-$chat-message-bg: $background-color;
-
 .chat {
 	display: flex;
 	flex-direction: column;

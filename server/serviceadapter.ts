@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable no-unused-vars */
-import { Video, VideoId, VideoMetadata, VideoService } from "ott-common/models/video";
-import { IncompleteServiceAdapterException } from "./exceptions";
-import { getLogger } from "./logger";
-import { BulkVideoResult } from "./infoextractor";
+import type { Video, VideoMetadata, VideoService } from "ott-common/models/video.js";
+import { IncompleteServiceAdapterException } from "./exceptions.js";
+import { getLogger } from "./logger.js";
+import type { BulkVideoResult } from "./infoextractor.js";
 
 const log = getLogger("serviceadapter");
 export interface VideoRequest {
@@ -17,7 +17,7 @@ export class ServiceAdapter {
 	 */
 	get serviceId(): VideoService {
 		throw new IncompleteServiceAdapterException(
-			`Service adapter ${this.constructor.name} does not have a serviceId property`
+			`Service adapter ${this.constructor.name} does not have a serviceId property`,
 		);
 	}
 
@@ -47,7 +47,7 @@ export class ServiceAdapter {
 	 */
 	isCollectionURL(url: string): boolean {
 		throw new IncompleteServiceAdapterException(
-			`Service ${this.serviceId} does not implement method isCollectionURL`
+			`Service ${this.serviceId} does not implement method isCollectionURL`,
 		);
 	}
 
@@ -56,7 +56,7 @@ export class ServiceAdapter {
 	 */
 	getVideoId(url: string): string {
 		throw new IncompleteServiceAdapterException(
-			`Service ${this.serviceId} does not implement method getVideoId`
+			`Service ${this.serviceId} does not implement method getVideoId`,
 		);
 	}
 
@@ -65,7 +65,7 @@ export class ServiceAdapter {
 	 */
 	async fetchVideoInfo(id: string, properties?: (keyof VideoMetadata)[]): Promise<Video> {
 		throw new IncompleteServiceAdapterException(
-			`Service ${this.serviceId} does not implement method fetchVideoInfo`
+			`Service ${this.serviceId} does not implement method fetchVideoInfo`,
 		);
 	}
 
@@ -74,13 +74,13 @@ export class ServiceAdapter {
 	 * @param requests List of objects with id and missingInfo keys
 	 */
 	async fetchManyVideoInfo(requests: VideoRequest[]): Promise<Video[]> {
-		let videos: Video[] = [];
-		for (let req of requests) {
+		const videos: Video[] = [];
+		for (const req of requests) {
 			try {
 				videos.push(await this.fetchVideoInfo(req.id, req.missingInfo));
 			} catch (error) {
 				log.warn(
-					`fetchManyVideoInfo: failed to fetch ${this.serviceId}:${req.id}: ${error}, skipping`
+					`fetchManyVideoInfo: failed to fetch ${this.serviceId}:${req.id}: ${error}, skipping`,
 				);
 			}
 		}
@@ -92,10 +92,10 @@ export class ServiceAdapter {
 	 */
 	async resolveURL(
 		url: string,
-		properties?: (keyof VideoMetadata)[]
+		properties?: (keyof VideoMetadata)[],
 	): Promise<(Video | { url: string })[] | BulkVideoResult> {
 		throw new IncompleteServiceAdapterException(
-			`Service ${this.serviceId} does not implement method resolveURL`
+			`Service ${this.serviceId} does not implement method resolveURL`,
 		);
 	}
 
@@ -105,5 +105,13 @@ export class ServiceAdapter {
 	 */
 	async searchVideos(query: string): Promise<Video[]> {
 		return [];
+	}
+
+	/**
+	 * Post-processes a video object before it is returned to the caller.
+	 */
+	postProcessVideo(video: Video): Video {
+		log.warn(`Service ${this.serviceId} does not implement method postProcessVideo`);
+		return video;
 	}
 }

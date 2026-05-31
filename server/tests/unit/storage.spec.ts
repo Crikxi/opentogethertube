@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import _ from "lodash";
-import { CachedVideo, Room as DbRoom, User, loadModels } from "../../models";
-import storage from "../../storage";
-import permissions, { Grants } from "ott-common/permissions";
-import { Visibility, QueueMode } from "ott-common/models/types";
-import { Video, VideoId } from "ott-common/models/video";
-import { Room } from "../../room";
-import { roomToDb, roomToDbPartial } from "../../storage/room";
-import { buildClients } from "../../redisclient";
+import { CachedVideo, Room as DbRoom, User, loadModels } from "../../models/index.js";
+import storage from "../../storage.js";
+import permissions from "ott-common/permissions.js";
+import { Visibility, QueueMode } from "ott-common/models/types.js";
+import type { Video } from "ott-common/models/video.js";
+import { Room } from "../../room.js";
+import { roomToDb, roomToDbPartial } from "../../storage/room.js";
+import { buildClients } from "../../redisclient.js";
 
 describe(
 	"Storage: Room Spec",
@@ -33,8 +33,8 @@ describe(
 				description: "This is an example room.",
 				owner: user,
 			});
-			let dbroom = roomToDb(room);
-			let dbroomPartial = roomToDbPartial(room);
+			const dbroom = roomToDb(room);
+			const dbroomPartial = roomToDbPartial(room);
 			expect(dbroom).toMatchObject(dbroomPartial);
 		});
 
@@ -46,7 +46,7 @@ describe(
 					description: "This is an example room.",
 					visibility: Visibility.Public,
 					queueMode: QueueMode.Vote,
-				})
+				}),
 			);
 
 			await new Promise(resolve => setTimeout(resolve, 200));
@@ -64,7 +64,7 @@ describe(
 					visibility: Visibility.Public,
 					queueMode: QueueMode.Vote,
 					owner: null,
-				})
+				}),
 			);
 		});
 
@@ -75,7 +75,7 @@ describe(
 					title: "Example Room",
 					description: "This is an example room.",
 					visibility: Visibility.Public,
-				})
+				}),
 			);
 
 			const room = await storage.getRoomByName("capitalizedexampleroom");
@@ -107,13 +107,13 @@ describe(
 						title: "Example Room",
 						description: "This is an example room.",
 						visibility: Visibility.Public,
-					})
-				)
+					}),
+				),
 			).toBe(true);
 
 			await new Promise(resolve => setTimeout(resolve, 200));
 
-			let room = await DbRoom.findOne({ where: { name: "example" } });
+			const room = await DbRoom.findOne({ where: { name: "example" } });
 			expect(room).toBeInstanceOf(DbRoom);
 			expect(room?.id).toBeDefined();
 			expect(room).toMatchObject({
@@ -126,13 +126,13 @@ describe(
 
 		it("should not create room if name matches existing room, case insensitive", async () => {
 			await storage.saveRoom(
-				new Room({ name: "CapitalizedExampleRoom", visibility: Visibility.Public })
+				new Room({ name: "CapitalizedExampleRoom", visibility: Visibility.Public }),
 			);
 
 			expect(
 				await storage.saveRoom(
-					new Room({ name: "capitalizedexampleroom", visibility: Visibility.Public })
-				)
+					new Room({ name: "capitalizedexampleroom", visibility: Visibility.Public }),
+				),
 			).toBe(false);
 		});
 
@@ -146,13 +146,13 @@ describe(
 					title: "Example Room",
 					description: "This is an example room.",
 					visibility: Visibility.Unlisted,
-				})
+				}),
 			).toBe(true);
 
 			// HACK: wait for the database to update. This test is flaky without this.
 			await new Promise(resolve => setTimeout(resolve, 200));
 
-			let room = await DbRoom.findOne({ where: { name: "example" } });
+			const room = await DbRoom.findOne({ where: { name: "example" } });
 			expect(room).toBeInstanceOf(DbRoom);
 			expect(room?.id).toBeDefined();
 			expect(room).toMatchObject({
@@ -169,7 +169,7 @@ describe(
 					title: "Example Room",
 					description: "This is an example room.",
 					visibility: Visibility.Unlisted,
-				})
+				}),
 			).rejects.toThrow();
 		});
 
@@ -235,7 +235,7 @@ describe(
 			expect(room?.userRoles).toEqual(userRoles);
 		});
 	},
-	{ retry: 3 }
+	{ retry: 3 },
 );
 
 describe("Storage: CachedVideos Spec", () => {
@@ -361,7 +361,7 @@ describe("Storage: CachedVideos Spec", () => {
 					..._.omit(video, "id"),
 				};
 				return videoStorable;
-			})
+			}),
 		);
 		expect(await storage.getManyVideoInfo(videos)).toEqual(videos);
 	});
@@ -401,7 +401,7 @@ describe("Storage: CachedVideos Spec", () => {
 						..._.omit(video, "id"),
 					};
 					return videoStorable;
-				})
+				}),
 		);
 		expect(await storage.getManyVideoInfo(videos)).toEqual(videos);
 	});
@@ -436,9 +436,8 @@ describe("Storage: CachedVideos: bulk inserts/updates", () => {
 				serviceId: "abc789",
 				title: "existing video 3",
 			},
-		];
+		] as const;
 		for (const video of existingVideos) {
-			// @ts-expect-error it's complaining about the type of `service`, but it's valid
 			await CachedVideo.create(video);
 		}
 

@@ -20,6 +20,7 @@
 		:class="{ hide: !seekPreviewVisible }"
 		:style="{
 			left: seekPreviewX + 'px',
+			top: seekPreviewY + 'px',
 		}"
 	>
 		<span>{{ seekPreviewTimestamp }}</span>
@@ -27,7 +28,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, Ref, onMounted, onUpdated, computed } from "vue";
+import { ref, type Ref, onMounted, onUpdated, computed } from "vue";
 import VueSlider from "vue-slider-component";
 import { useStore } from "@/store";
 import { secondsToTimestamp } from "@/util/timestamp";
@@ -43,7 +44,7 @@ withDefaults(
 	}>(),
 	{
 		currentPosition: 0,
-	}
+	},
 );
 
 const store = useStore();
@@ -57,7 +58,7 @@ const granted = useGrants();
  * The video length is then used by the slider to define the maximum value (props.max).
  */
 const normalisedVideoLength = computed((): number => {
-	if (store.state.room.currentSource && store.state.room.currentSource.length) {
+	if (store.state.room.currentSource?.length) {
 		const videoLength = store.state.room.currentSource.length;
 		return Math.round(videoLength * 10) / 10;
 	} else {
@@ -134,6 +135,7 @@ function getSliderProcesses(dotsPos: number[]) {
 const seekPreviewPercent: Ref<number | null> = ref(null);
 const seekPreviewTimestamp = ref("");
 const seekPreviewX = ref(0); // x position of the timestamp
+const seekPreviewY = ref(0); // y position of the timestamp
 const railHovered = ref(false);
 const seekPreviewVisible = computed(() => {
 	return railHovered.value;
@@ -147,9 +149,10 @@ function updateSeekPreview(e) {
 	railHovered.value = true;
 	const sliderRect = slider.getBoundingClientRect();
 	const sliderPos = e.clientX - sliderRect.left;
+	const sliderY = sliderRect.top;
 	seekPreviewPercent.value = sliderPos / sliderRect.width;
 	seekPreviewTimestamp.value = secondsToTimestamp(
-		seekPreviewPercent.value * (store.state.room.currentSource?.length ?? 0)
+		seekPreviewPercent.value * (store.state.room.currentSource?.length ?? 0),
 	);
 	const seekPreview = document.getElementById("seek-preview");
 	if (!seekPreview) {
@@ -157,7 +160,8 @@ function updateSeekPreview(e) {
 	}
 	const baseX = sliderPos;
 	const seekPreviewRect = seekPreview.getBoundingClientRect();
-	seekPreviewX.value = baseX + 12 - seekPreviewRect.width / 2;
+	seekPreviewX.value = sliderRect.left + baseX - seekPreviewRect.width / 2;
+	seekPreviewY.value = sliderY - 14 - seekPreviewRect.height / 2;
 }
 
 function resetSeekPreview() {
@@ -188,8 +192,7 @@ onUpdated(() => {
 
 <style lang="scss" scoped>
 #seek-preview {
-	position: absolute;
-	top: -14px;
+	position: fixed;
 	background-color: rgba(0, 0, 0, 0.6);
 	color: white;
 	display: flex;

@@ -3,7 +3,7 @@
 		<v-card-title>
 			{{ $t("room.users.title") }}
 			<v-btn icon size="x-small" @click="openEditName" aria-label="toggle edit name">
-				<v-icon>mdi-wrench</v-icon>
+				<v-icon :icon="mdiWrench" />
 			</v-btn>
 		</v-card-title>
 		<v-list-item v-if="showEditName">
@@ -64,8 +64,8 @@
 
 				<div v-if="user.id !== store.state.users.you.id">
 					<v-btn class="user-actions" variant="flat" depressed tile>
-						<v-icon size="small">mdi-wrench</v-icon>
-						<v-icon size="small" style="margin-left: 5px">mdi-chevron-down</v-icon>
+						<v-icon size="small" :icon="mdiWrench" />
+						<v-icon size="small" style="margin-left: 5px" :icon="mdiChevronDown" />
 						<v-menu right offset-y activator="parent">
 							<v-list>
 								<div class="user-promotion">
@@ -104,9 +104,19 @@
 </template>
 
 <script lang="ts" setup>
+import {
+	mdiWrench,
+	mdiChevronDown,
+	mdiStar,
+	mdiChevronUp,
+	mdiThumbUp,
+	mdiProgressDownload,
+	mdiCheckBold,
+	mdiExclamation,
+} from "@mdi/js";
 import { ref, inject } from "vue";
 import { API } from "@/common-http";
-import { ClientId, PlayerStatus, RoomUserInfo } from "ott-common/models/types";
+import { type ClientId, PlayerStatus, type RoomUserInfo } from "ott-common/models/types";
 import { USERNAME_LENGTH_MAX } from "ott-common/constants";
 import { Role } from "ott-common/models/types";
 import { ROLE_NAMES } from "ott-common/permissions";
@@ -199,18 +209,18 @@ function canSelfKickUser(user: RoomUserInfo): boolean {
 
 function getRoleIcon(role: Role) {
 	return {
-		[Role.Owner]: "mdi-star",
-		[Role.Administrator]: "mdi-star",
-		[Role.Moderator]: "mdi-chevron-up",
-		[Role.TrustedUser]: "mdi-thumb-up",
+		[Role.Owner]: mdiStar,
+		[Role.Administrator]: mdiStar,
+		[Role.Moderator]: mdiChevronUp,
+		[Role.TrustedUser]: mdiThumbUp,
 	}[role];
 }
 
 function getPlayerStatusIcon(status: PlayerStatus) {
 	return {
-		[PlayerStatus.buffering]: "mdi-progress-download",
-		[PlayerStatus.ready]: "mdi-check-bold",
-		[PlayerStatus.error]: "mdi-exclamation",
+		[PlayerStatus.buffering]: mdiProgressDownload,
+		[PlayerStatus.ready]: mdiCheckBold,
+		[PlayerStatus.error]: mdiExclamation,
 	}[status];
 }
 
@@ -224,8 +234,6 @@ function kickUser(clientId: ClientId) {
 </script>
 
 <style lang="scss" scoped>
-@import "../variables.scss";
-
 .user {
 	display: flex;
 	flex-direction: row;
@@ -251,7 +259,7 @@ function kickUser(clientId: ClientId) {
 
 	&.role-owner {
 		.role {
-			color: $brand-color;
+			color: rgb(var(--v-theme-primary));
 		}
 	}
 }

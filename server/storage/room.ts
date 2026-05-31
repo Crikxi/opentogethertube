@@ -1,10 +1,10 @@
-import { Room as DbRoomModel, User as UserModel } from "../models";
-import { Room as DbRoom, RoomAttributes } from "../models/room";
-import { Role, RoomOptions } from "ott-common/models/types";
-import { getLogger } from "../logger";
+import { Room as DbRoomModel, User as UserModel } from "../models/index.js";
+import type { Room as DbRoom, RoomAttributes } from "../models/room.js";
+import { Role, type RoomOptions } from "ott-common/models/types.js";
+import { getLogger } from "../logger.js";
 import Sequelize from "sequelize";
-import permissions from "ott-common/permissions";
-import type { RoomStatePersistable } from "../room";
+import permissions from "ott-common/permissions.js";
+import type { RoomStatePersistable } from "../room.js";
 import _ from "lodash";
 
 const log = getLogger("storage/room");
@@ -13,8 +13,8 @@ function buildFindRoomWhere(roomName: string) {
 	return Sequelize.and(
 		Sequelize.where(
 			Sequelize.fn("lower", Sequelize.col("name")),
-			Sequelize.fn("lower", roomName)
-		)
+			Sequelize.fn("lower", roomName),
+		),
 	);
 }
 
@@ -88,6 +88,23 @@ export async function updateRoom(room: Partial<RoomStatePersistable>): Promise<b
 	}
 }
 
+export async function deleteRoom(roomName: string): Promise<boolean> {
+	try {
+		const deleted = await DbRoomModel.destroy({
+			where: buildFindRoomWhere(roomName),
+		});
+		if (deleted === 0) {
+			log.debug(`Room ${roomName} not found in db to delete.`);
+		} else {
+			log.info(`Deleted room ${roomName} from db: ${deleted} row(s)`);
+		}
+		return deleted > 0;
+	} catch (err) {
+		log.error(`Failed to delete room ${roomName} from storage: ${err}`);
+		throw err;
+	}
+}
+
 function dbToRoomArgs(db: DbRoom): RoomOptions {
 	const room = {
 		name: db.name,
@@ -114,26 +131,26 @@ function dbToRoomArgs(db: DbRoom): RoomOptions {
  * Converts a room into an object that can be stored in the database
  */
 export function roomToDb(room: RoomStatePersistable): Omit<RoomAttributes, "id"> {
-	let grantsFiltered = _.cloneDeep(room.grants);
+	const grantsFiltered = _.cloneDeep(room.grants);
 	// No need to waste storage space on these
 	grantsFiltered.deleteRole(Role.Administrator);
 	grantsFiltered.deleteRole(Role.Owner);
 
 	const db: Omit<RoomAttributes, "id"> = {
-		"name": room.name,
-		"title": room.title,
-		"description": room.description,
-		"visibility": room.visibility,
-		"queueMode": room.queueMode,
-		"autoSkipSegmentCategories": room.autoSkipSegmentCategories,
-		"permissions": grantsFiltered.toJSON(),
-		"ownerId": null,
+		name: room.name,
+		title: room.title,
+		description: room.description,
+		visibility: room.visibility,
+		queueMode: room.queueMode,
+		autoSkipSegmentCategories: room.autoSkipSegmentCategories,
+		permissions: grantsFiltered.toJSON(),
+		ownerId: null,
 		"role-trusted": [],
 		"role-mod": [],
 		"role-admin": [],
-		"prevQueue": room.prevQueue,
-		"restoreQueueBehavior": room.restoreQueueBehavior,
-		"enableVoteSkip": room.enableVoteSkip,
+		prevQueue: room.prevQueue,
+		restoreQueueBehavior: room.restoreQueueBehavior,
+		enableVoteSkip: room.enableVoteSkip,
 	};
 	if (room.owner) {
 		db.ownerId = room.owner.id;
@@ -141,7 +158,7 @@ export function roomToDb(room: RoomStatePersistable): Omit<RoomAttributes, "id">
 	if (room.userRoles) {
 		for (let i = Role.TrustedUser; i <= 4; i++) {
 			db[`role-${permissions.ROLE_NAMES[i]}`] = Array.from(
-				room.userRoles.get(i)?.values() ?? []
+				room.userRoles.get(i)?.values() ?? [],
 			);
 		}
 	}
@@ -152,7 +169,7 @@ export function roomToDb(room: RoomStatePersistable): Omit<RoomAttributes, "id">
  * Converts a room into an object that can be stored in the database
  */
 export function roomToDbPartial(
-	room: Partial<RoomStatePersistable>
+	room: Partial<RoomStatePersistable>,
 ): Partial<Omit<RoomAttributes, "id" | "name">> {
 	const db: Partial<Omit<RoomAttributes, "id" | "name">> = _.pickBy(
 		{
@@ -161,14 +178,17 @@ export function roomToDbPartial(
 			visibility: room.visibility,
 			queueMode: room.queueMode,
 			autoSkipSegmentCategories: room.autoSkipSegmentCategories,
-			prevQueue: room.prevQueue,
 			restoreQueueBehavior: room.restoreQueueBehavior,
 			enableVoteSkip: room.enableVoteSkip,
 		},
-		v => !!v
+		v => !!v,
 	);
+	// room.prevQueue will become null if its length is 0, so we need to explicitly check for null here
+	if (room.prevQueue || room.prevQueue === null) {
+		db.prevQueue = room.prevQueue;
+	}
 	if (room.grants) {
-		let grantsFiltered = _.cloneDeep(room.grants);
+		const grantsFiltered = _.cloneDeep(room.grants);
 		// No need to waste storage space on these
 		grantsFiltered.deleteRole(Role.Administrator);
 		grantsFiltered.deleteRole(Role.Owner);
@@ -180,7 +200,7 @@ export function roomToDbPartial(
 	if (room.userRoles) {
 		for (let i = Role.TrustedUser; i <= 4; i++) {
 			db[`role-${permissions.ROLE_NAMES[i]}`] = Array.from(
-				room.userRoles.get(i)?.values() ?? []
+				room.userRoles.get(i)?.values() ?? [],
 			);
 		}
 	}

@@ -74,12 +74,13 @@ function setAddPreviewText(url: string) {
 }
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
-@import "../variables.scss";
+@use "../variables.scss";
 
 .add-video-helper {
 	width: 400px;
-	@media (max-width: $sm-max) {
+	@media (max-width: variables.$sm-max) {
 		width: 80%;
 	}
 

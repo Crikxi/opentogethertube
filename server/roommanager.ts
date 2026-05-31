@@ -1,21 +1,21 @@
-import { Room, RoomState, RoomStateFromRedis, RoomStatePersistable } from "./room";
-import { AuthToken, Role, RoomOptions, Visibility } from "ott-common/models/types";
+import { Room, type RoomState, type RoomStateFromRedis } from "./room.js";
+import type { Role, RoomOptions, Visibility } from "ott-common/models/types.js";
 import _ from "lodash";
-import { getLogger } from "./logger";
-import { redisClient } from "./redisclient";
-import storage from "./storage";
+import { getLogger } from "./logger.js";
+import { redisClient } from "./redisclient.js";
+import storage from "./storage.js";
 import {
-	RoomAlreadyLoadedException,
+	type RoomAlreadyLoadedException,
 	RoomNameTakenException,
 	RoomNotFoundException,
-} from "./exceptions";
-import { RoomRequest, RoomRequestContext, ServerMessage } from "ott-common/models/messages";
+} from "./exceptions.js";
+import type { ServerMessage } from "ott-common/models/messages.js";
 import { Gauge } from "prom-client";
-import { EventEmitter } from "events";
-import { Result, ok, err } from "ott-common/result";
-import { Grants } from "ott-common/permissions";
-import type { ClientManagerCommand } from "./clientmanager";
-import { UnloadReason } from "./generated";
+import { EventEmitter } from "node:events";
+import { type Result, ok, err } from "ott-common/result.js";
+import { Grants } from "ott-common/permissions.js";
+import type { ClientManagerCommand } from "./clientmanager.js";
+import { UnloadReason } from "./generated.js";
 
 export const log = getLogger("roommanager");
 export const rooms: Room[] = [];
@@ -25,12 +25,12 @@ export type RoomManagerEvents = "publish" | "load" | "unload" | "command";
 export type RoomManagerEventHandlers<E> = E extends "publish"
 	? (roomName: string, message: ServerMessage) => void
 	: E extends "load"
-	? (roomName: string) => void
-	: E extends "unload"
-	? (roomName: string, reason: UnloadReason) => void
-	: E extends "command"
-	? (roomName: string, command: ClientManagerCommand) => void
-	: never;
+		? (roomName: string) => void
+		: E extends "unload"
+			? (roomName: string, reason: UnloadReason) => void
+			: E extends "command"
+				? (roomName: string, command: ClientManagerCommand) => void
+				: never;
 const bus = new EventEmitter();
 
 async function addRoom(room: Room) {
@@ -44,7 +44,7 @@ async function addRoom(room: Room) {
 	bus.emit("load", room.name);
 }
 
-let updaterInterval: NodeJS.Timer | null = null;
+let updaterInterval: ReturnType<typeof setInterval> | null = null;
 export async function start() {
 	log.info("Starting room manager");
 
@@ -58,7 +58,7 @@ export async function shutdown() {
 		updaterInterval = null;
 	}
 	await Promise.all(
-		rooms.map(room => unloadRoom(room.name, UnloadReason.Shutdown, { preserveRedis: true }))
+		rooms.map(room => unloadRoom(room.name, UnloadReason.Shutdown, { preserveRedis: true })),
 	);
 }
 
@@ -128,7 +128,7 @@ export async function createRoom(options: Partial<RoomOptions> & { name: string 
  */
 export async function getRoom(
 	roomName: string,
-	options: { mustAlreadyBeLoaded?: boolean } = {}
+	options: { mustAlreadyBeLoaded?: boolean } = {},
 ): Promise<Result<Room, RoomNotFoundException | RoomAlreadyLoadedException>> {
 	_.defaults(options, {
 		mustAlreadyBeLoaded: false,
@@ -167,7 +167,7 @@ export async function getRoom(
 export async function unloadRoom(
 	room: string | Room,
 	reason: UnloadReason,
-	options: Partial<{ preserveRedis: boolean }> = {}
+	options: Partial<{ preserveRedis: boolean }> = {},
 ): Promise<void> {
 	const opts = _.defaults(options, {
 		preserveRedis: false,
@@ -228,12 +228,13 @@ export function on<E extends RoomManagerEvents>(event: E, listener: RoomManagerE
 	bus.on(event, listener);
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const gaugeRoomCount = new Gauge({
 	name: "ott_room_count",
 	help: "The number of loaded rooms.",
 	labelNames: ["roomType", "visibility"],
 	collect() {
-		let counts: Record<"temporary" | "permanent", Record<Visibility, number>> = {
+		const counts: Record<"temporary" | "permanent", Record<Visibility, number>> = {
 			temporary: {
 				public: 0,
 				unlisted: 0,
@@ -248,15 +249,16 @@ const gaugeRoomCount = new Gauge({
 		for (const room of rooms) {
 			counts[room.isTemporary ? "temporary" : "permanent"][room.visibility] += 1;
 		}
-		for (let roomType of Object.keys(counts)) {
-			for (let visibility of Object.keys(counts[roomType])) {
-				let value = counts[roomType][visibility];
+		for (const roomType of Object.keys(counts)) {
+			for (const visibility of Object.keys(counts[roomType])) {
+				const value = counts[roomType][visibility];
 				this.set({ roomType, visibility }, value);
 			}
 		}
 	},
 });
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const gaugeUsersInRooms = new Gauge({
 	name: "ott_users_in_rooms",
 	help: "The number of users that the room manager thinks are in rooms.",

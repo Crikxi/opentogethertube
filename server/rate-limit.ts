@@ -1,15 +1,14 @@
-import { getLogger } from "./logger";
-import { redisClient } from "./redisclient";
+import { getLogger } from "./logger.js";
+import { redisClient } from "./redisclient.js";
 import {
-	IRateLimiterStoreOptions,
+	type IRateLimiterStoreOptions,
 	RateLimiterMemory,
 	RateLimiterRedis,
 	type RateLimiterAbstract,
-	RateLimiterStoreAbstract,
 	RateLimiterRes,
 } from "rate-limiter-flexible";
-import { conf } from "./ott-config";
-import { RedisClientType } from "redis";
+import { conf } from "./ott-config.js";
+import type { RedisClientType } from "redis";
 
 const log = getLogger("api/rate-limit");
 
@@ -35,13 +34,13 @@ export async function consumeRateLimitPoints(
 	res,
 	key: string,
 	points: number,
-	limiter: RateLimiterAbstract = rateLimiter
+	limiter: RateLimiterAbstract = rateLimiter,
 ): Promise<boolean> {
 	if (!conf.get("rate_limit.enabled")) {
 		return true;
 	}
 	try {
-		let info = await limiter.consume(key, points);
+		const info = await limiter.consume(key, points);
 		setRateLimitHeaders(res, info);
 		return true;
 	} catch (e) {

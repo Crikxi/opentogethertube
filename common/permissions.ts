@@ -1,6 +1,5 @@
-import _ from "lodash";
-import { PermissionDeniedException, InvalidRoleException } from "./exceptions";
-import { Role } from "./models/types";
+import { PermissionDeniedException, InvalidRoleException } from "./exceptions.js";
+import { Role } from "./models/types.js";
 
 export type GrantMask = number;
 export type PermissionName = string;
@@ -148,6 +147,11 @@ export const PERMISSIONS = [
 		mask: 1 << 25,
 		minRole: Role.UnregisteredUser,
 	}),
+	new Permission({
+		name: "manage-queue.edit",
+		mask: 1 << 26,
+		minRole: Role.UnregisteredUser,
+	}),
 ];
 
 const permMaskMap = new Map(PERMISSIONS.map(p => [p.name, p.mask]));
@@ -184,7 +188,7 @@ function defaultPermissions(): Grants {
  * Creates a deterministic mask given a list of string form permissions.
  */
 export function parseIntoGrantMask(perms: PermissionName[]): GrantMask {
-	if (!(perms instanceof Array)) {
+	if (!Array.isArray(perms)) {
 		throw new TypeError(`perms must be an array of strings, got ${typeof perms}`);
 	}
 	let mask = 0;
@@ -238,7 +242,7 @@ export class Grants {
 	 * @param {Object|undefined} grants Optional object that maps roles to grant masks.
 	 */
 	constructor(
-		grants: Grants | RoleGrants | OldRoleGrants | [Role, GrantMask][] | undefined = undefined
+		grants: Grants | RoleGrants | OldRoleGrants | [Role, GrantMask][] | undefined = undefined,
 	) {
 		if (!grants) {
 			grants = defaultPermissions();
@@ -266,7 +270,7 @@ export class Grants {
 			this.setAllGrants(grants.masks);
 		} else if (grants instanceof Map) {
 			for (const role of grants.keys()) {
-				let mask = grants.get(role);
+				const mask = grants.get(role);
 				if (!mask) {
 					continue;
 				}
@@ -275,7 +279,7 @@ export class Grants {
 		} else {
 			for (const r in grants) {
 				const role = _normalizeRoleId(r);
-				if (Object.hasOwnProperty.call(grants, role)) {
+				if (Object.hasOwn(grants, role)) {
 					this.setRoleGrants(role, grants[role]!);
 				}
 			}
@@ -286,7 +290,7 @@ export class Grants {
 	 * @returns Grant bitmask
 	 */
 	private _normalizePermissionsInput(permissions: PermissionName[] | GrantMask): GrantMask {
-		if (permissions instanceof Array) {
+		if (Array.isArray(permissions)) {
 			permissions = parseIntoGrantMask(permissions);
 		}
 		return permissions;

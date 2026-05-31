@@ -1,10 +1,10 @@
 import Sequelize from "sequelize";
-import type { Model, Options } from "sequelize";
-import { getLogger } from "../logger";
-import { conf } from "../ott-config";
-import { createModel as createModelRoom } from "./room";
-import { createModel as createModelUser } from "./user";
-import { createModel as createModelCachedVideo } from "./cachedvideo";
+import type { Options } from "sequelize";
+import { getLogger } from "../logger.js";
+import { conf } from "../ott-config.js";
+import { createModel as createModelRoom } from "./room.js";
+import { createModel as createModelUser } from "./user.js";
+import { createModel as createModelCachedVideo } from "./cachedvideo.js";
 
 const log = getLogger("db");
 
@@ -87,7 +87,7 @@ function buildConnection(config: Sequelize.Options): Sequelize.Sequelize {
 				config.database,
 				config.username,
 				config.password,
-				config
+				config,
 			);
 		}
 	}

@@ -70,7 +70,7 @@ export const RegionView: React.FC<Props> = ({ systemState, assignColor, width, h
 			.select(".texts")
 			.selectAll("text")
 			.data(
-				tree.descendants().filter(d => d.data.group !== "root" && d.data.group !== "room")
+				tree.descendants().filter(d => d.data.group !== "root" && d.data.group !== "room"),
 			)
 			.join("text")
 			.attr("class", "text")
@@ -89,6 +89,7 @@ export const RegionView: React.FC<Props> = ({ systemState, assignColor, width, h
 			height={height}
 			ref={svgRef}
 		>
+			<title>Region View</title>
 			<g className="chart">
 				<g className="nodes" />
 				<g className="texts" />

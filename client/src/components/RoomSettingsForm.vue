@@ -22,6 +22,8 @@
 					{ title: $t('room-settings.unlisted'), value: Visibility.Unlisted },
 				]"
 				v-model="settings.visibility.value"
+				:menu="visibilityMenuOpen"
+				@update:menu="visibilityMenuOpen = $event"
 				:loading="isLoadingRoomSettings || dirtySettings.includes('visibility')"
 				:disabled="!granted('configure-room.set-visibility')"
 				data-cy="select-visibility"
@@ -151,13 +153,19 @@ import _ from "lodash";
 import PermissionsEditor from "@/components/PermissionsEditor.vue";
 import { ToastStyle } from "@/models/toast";
 import { API } from "@/common-http";
-import { Visibility, QueueMode, RoomSettings, Role, BehaviorOption } from "ott-common/models/types";
+import {
+	Visibility,
+	QueueMode,
+	type RoomSettings,
+	Role,
+	BehaviorOption,
+} from "ott-common/models/types";
 import { Grants } from "ott-common/permissions";
 import toast from "@/util/toast";
-import { Ref, onMounted, reactive, ref, toRefs } from "vue";
+import { type Ref, onMounted, reactive, ref, toRefs } from "vue";
 import { useStore } from "@/store";
 import { useI18n } from "vue-i18n";
-import { OttApiResponseGetRoom } from "ott-common/models/rest-api";
+import type { OttApiResponseGetRoom } from "ott-common/models/rest-api";
 import { useGrants } from "./composables/grants";
 import { useRoute } from "vue-router";
 import { watch } from "vue";
@@ -170,6 +178,12 @@ const granted = useGrants();
 const route = useRoute();
 
 const isLoadingRoomSettings = ref(false);
+const visibilityMenuOpen = ref(false);
+
+function openVisibilityMenu() {
+	visibilityMenuOpen.value = true;
+}
+
 const inputRoomSettings = reactive<RoomSettings>({
 	title: "",
 	description: "",
@@ -198,7 +212,7 @@ watchDebounced(
 		}
 		await submitRoomSettings();
 	},
-	{ debounce: 1000 }
+	{ debounce: 1000 },
 );
 
 onMounted(async () => {
@@ -217,7 +231,7 @@ async function loadRoomSettings() {
 	isLoadingRoomSettings.value = true;
 	try {
 		const res = await API.get<OttApiResponseGetRoom>(
-			`/room/${route.params.roomId ?? store.state.room.name}`
+			`/room/${route.params.roomId ?? store.state.room.name}`,
 		);
 		Object.assign(inputRoomSettings, intoSettings(res.data));
 		setTimeout(() => {
@@ -262,7 +276,7 @@ async function submitRoomSettings() {
 	try {
 		await API.patch(
 			`/room/${route.params.roomId ?? store.state.room.name}`,
-			getRoomSettingsSubmit()
+			getRoomSettingsSubmit(),
 		);
 		toast.add({
 			style: ToastStyle.Success,
@@ -306,9 +320,11 @@ async function claimOwnership() {
 }
 defineExpose({
 	loadRoomSettings,
+	openVisibilityMenu,
 });
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
 .room-settings .submit {
 	position: -webkit-sticky;

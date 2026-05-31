@@ -130,7 +130,7 @@
 								href="https://github.com/sponsors/dyc3"
 								target="_blank"
 							>
-								<v-icon class="side-pad">mdi-heart</v-icon>
+								<v-icon class="side-pad" :icon="mdiHeart" />
 								{{ $t("landing.support.sponsor") }}
 							</v-btn>
 							<v-btn
@@ -141,7 +141,7 @@
 								href="https://github.com/dyc3/opentogethertube"
 								target="_blank"
 							>
-								<v-icon class="side-pad">mdi-xml</v-icon>
+								<v-icon class="side-pad" :icon="mdiXml" />
 								{{ $t("landing.support.contribute") }}
 							</v-btn>
 						</v-col>
@@ -179,6 +179,7 @@
 </template>
 
 <script lang="ts" setup>
+import { mdiHeart, mdiXml } from "@mdi/js";
 import { computed } from "vue";
 import { createRoomHelper } from "@/util/roomcreator";
 import { useStore } from "@/store";
@@ -198,7 +199,7 @@ const cardHeight = computed(() => {
 </script>
 
 <style lang="scss" scoped>
-@import "../variables.scss";
+@use "../variables.scss";
 
 .home {
 	width: 100%;
@@ -221,7 +222,7 @@ const cardHeight = computed(() => {
 		font-size: 52px;
 	}
 
-	@media only screen and (max-width: $xs-max) {
+	@media only screen and (max-width: variables.$xs-max) {
 		h1 {
 			font-size: 48px;
 		}
@@ -240,12 +241,12 @@ const cardHeight = computed(() => {
 			.v-btn {
 				background: transparent !important;
 				// margin: 0 10px;
-				@media only screen and (max-width: $md-max) {
+				@media only screen and (max-width: variables.$md-max) {
 					margin-top: 22px;
 				}
 			}
 
-			@media screen and (max-width: $sm-max) {
+			@media screen and (max-width: variables.$sm-max) {
 				flex-direction: column;
 			}
 		}

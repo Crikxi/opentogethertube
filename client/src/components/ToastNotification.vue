@@ -1,8 +1,6 @@
 <template>
 	<v-sheet :color="color" class="toast" elevation="12" aria-live="polite">
-		<v-icon class="toast-icon" v-if="!!icon">
-			{{ icon }}
-		</v-icon>
+		<v-icon class="toast-icon" v-if="!!icon" :icon="icon" />
 		<span class="toast-content">
 			<ProcessedText :text="toast.content" :show-add-queue-tooltip="false" />
 		</span>
@@ -18,15 +16,16 @@
 				icon
 				:aria-label="$t('common.close')"
 			>
-				<v-icon>mdi-close</v-icon>
+				<v-icon :icon="mdiClose" />
 			</v-btn>
 		</div>
 	</v-sheet>
 </template>
 
 <script lang="ts" setup>
-import { ref, toRefs, onMounted, onUnmounted, Ref, computed } from "vue";
-import { Toast, ToastStyle } from "@/models/toast";
+import { mdiClose, mdiCheckBold, mdiAlertCircle } from "@mdi/js";
+import { ref, toRefs, onMounted, onUnmounted, type Ref, computed } from "vue";
+import { type Toast, ToastStyle } from "@/models/toast";
 import { RoomRequestType } from "ott-common/models/messages";
 import { API } from "@/common-http";
 import toasts from "@/util/toast";
@@ -66,9 +65,9 @@ const color = computed(() => {
 
 const icon = computed(() => {
 	if (toast.value.style === ToastStyle.Success) {
-		return "mdi-check-bold";
+		return mdiCheckBold;
 	} else if (toast.value.style === ToastStyle.Error) {
-		return "mdi-alert-circle";
+		return mdiAlertCircle;
 	}
 	return undefined;
 });

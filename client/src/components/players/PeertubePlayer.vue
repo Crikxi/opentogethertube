@@ -1,5 +1,10 @@
 <template>
-	<iframe class="peertube" id="peertube-player" :src="peertubeUrl"></iframe>
+	<iframe
+		title="PeerTube Player"
+		class="peertube"
+		id="peertube-player"
+		:src="peertubeUrl"
+	></iframe>
 </template>
 
 <script lang="ts">
@@ -9,6 +14,7 @@ import { PeerTubePlayer as Peertube } from "@peertube/embed-api";
 // CURRENTLY SOMEWHAT BROKEN
 // does not respect position syncing for some reason.
 
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
 const PeertubePlayer = defineComponent({
 	name: "PeertubePlayer",
 	props: {
@@ -16,13 +22,13 @@ const PeertubePlayer = defineComponent({
 	},
 	emits: ["playing", "paused", "ready", "buffering", "error", "apiready"],
 	setup(props, { emit }) {
-		let player: Peertube | undefined = undefined;
+		let player: Peertube | undefined;
 
 		const videoId = computed(() => props.videoId.split(":"));
 		const peertubeHost = computed(() => videoId.value[0]);
 		const peertubeId = computed(() => videoId.value[1]);
 		const peertubeUrl = computed(
-			() => `https://${peertubeHost.value}/videos/embed/${peertubeId.value}?controls=0&api=1`
+			() => `https://${peertubeHost.value}/videos/embed/${peertubeId.value}?controls=0&api=1`,
 		);
 
 		onMounted(async () => {
@@ -80,6 +86,10 @@ const PeertubePlayer = defineComponent({
 			return false;
 		}
 
+		function isQualitySupported(): boolean {
+			return false;
+		}
+
 		function getAvailablePlaybackRates(): number[] {
 			return player.getPlaybackRates();
 		}
@@ -101,6 +111,7 @@ const PeertubePlayer = defineComponent({
 			setPosition,
 			setVolume,
 			isCaptionsSupported,
+			isQualitySupported,
 			getAvailablePlaybackRates,
 			getPlaybackRate,
 			setPlaybackRate,
@@ -108,5 +119,6 @@ const PeertubePlayer = defineComponent({
 	},
 });
 
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
 export default PeertubePlayer;
 </script>

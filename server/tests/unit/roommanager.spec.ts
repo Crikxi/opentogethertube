@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import roommanager, { redisStateToState } from "../../roommanager";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { Room as DbRoom, loadModels } from "../../models";
-import { Room, RoomStateFromRedis } from "../../room";
-import { AuthToken, QueueMode, Role, Visibility } from "ott-common/models/types";
+import roommanager, { redisStateToState } from "../../roommanager.js";
+import { Room as DbRoom, loadModels } from "../../models/index.js";
+import { Room, type RoomStateFromRedis } from "../../room.js";
+import { QueueMode, Role, Visibility } from "ott-common/models/types.js";
 import dayjs from "dayjs";
-import { RoomNotFoundException } from "../../exceptions";
-import storage from "../../storage";
-import { RoomRequest, RoomRequestType } from "ott-common/models/messages";
-import { VideoQueue } from "../../../server/videoqueue";
-import { buildClients } from "../../redisclient";
-import { UnloadReason } from "../../generated";
+import { RoomNotFoundException } from "../../exceptions.js";
+import storage from "../../storage.js";
+import { VideoQueue } from "../../../server/videoqueue.js";
+import { buildClients } from "../../redisclient.js";
+import { UnloadReason } from "../../generated.js";
 
 describe("Room manager", () => {
 	beforeAll(async () => {
@@ -42,7 +39,7 @@ describe("Room manager", () => {
 				expect(room?.permissions).toBeInstanceOf(Array);
 				// eslint-disable-next-line vitest/no-conditional-in-test
 				if (Array.isArray(room?.permissions)) {
-					let roles = room?.permissions.map(p => p[0]);
+					const roles = room?.permissions.map(p => p[0]);
 					expect(roles).not.toContain(Role.Administrator);
 					expect(roles).not.toContain(Role.Owner);
 				}
@@ -51,7 +48,7 @@ describe("Room manager", () => {
 				expect(room?.["role-trusted"]).toBeInstanceOf(Array);
 				await room?.destroy();
 			},
-			{ retry: 2 }
+			{ retry: 2 },
 		);
 
 		it(
@@ -77,7 +74,7 @@ describe("Room manager", () => {
 				});
 				await room?.destroy();
 			},
-			{ retry: 2 }
+			{ retry: 2 },
 		);
 	});
 
@@ -117,11 +114,41 @@ describe("Room manager", () => {
 			expect(loadedRoom._playbackStart).toEqual(room._playbackStart);
 			expect(loadedRoom.realPlaybackPosition).toBeCloseTo(20, 1);
 		});
+
+		it("should preserve empty prevQueue on unload and reload when current queue is empty", async () => {
+			const roomName = "test-prevqueue-empty";
+			try {
+				await roommanager.createRoom({ name: roomName, isTemporary: false });
+				const room = (await roommanager.getRoom(roomName)).unwrap();
+
+				room.prevQueue = [{ service: "direct", id: "foo" }];
+				room.queue = new VideoQueue([]);
+				room.currentSource = null;
+
+				await room.sync();
+
+				let dbRoom = await DbRoom.findOne({ where: { name: roomName } });
+				expect(dbRoom).not.toBeNull();
+				expect(dbRoom?.prevQueue).toEqual([{ service: "direct", id: "foo" }]);
+
+				// prevQueue becomes null in "room.onBeforeUnload()" if prevQueue.length is 0
+				await roommanager.unloadRoom(roomName, UnloadReason.Keepalive);
+
+				dbRoom = await DbRoom.findOne({ where: { name: roomName } });
+				expect(dbRoom).not.toBeNull();
+				expect(dbRoom?.prevQueue).toBeNull();
+
+				const loaded = (await roommanager.getRoom(roomName)).unwrap();
+				expect(loaded.prevQueue).toBeNull();
+			} finally {
+				await DbRoom.destroy({ where: { name: roomName } });
+			}
+		});
 	});
 
 	it("should not load the room if it is not already loaded in memory", async () => {
 		const getRoomByNameSpy = vi.spyOn(storage, "getRoomByName").mockResolvedValue(null);
-		let result = await roommanager.getRoom("test", {
+		const result = await roommanager.getRoom("test", {
 			mustAlreadyBeLoaded: true,
 		});
 		expect(result.ok).toEqual(false);

@@ -1,20 +1,44 @@
+import { computed, inject, onMounted, type Ref, ref, shallowRef, watch } from "vue";
+import type { CaptionTrack, VideoTrack } from "@/models/media-tracks";
 import { useStore } from "@/store";
-import { onMounted, ref, watch, type Ref, shallowRef, provide, inject, computed } from "vue";
 
 const volume = ref(100);
+const prevVolume = ref(100);
+const isMuted = ref(false);
 
 export function useVolume() {
 	const store = useStore();
 
 	onMounted(() => {
 		volume.value = store.state.settings.volume;
+		isMuted.value = store.state.settings.muted;
 	});
 
 	watch(volume, () => {
-		store.commit("settings/UPDATE", { volume: volume.value });
+		// If user drags the volume slider while muted, automatically unmute
+		if (isMuted.value && volume.value > 0) {
+			isMuted.value = false;
+		}
+		// Save volume to settings only when not muted and volume is greater than 0
+		// This prevents saving volume = 0 when the user is muted
+		if (!isMuted.value && volume.value > 0) {
+			store.commit("settings/UPDATE", { volume: volume.value });
+		}
 	});
 
-	return volume;
+	watch(isMuted, () => {
+		if (isMuted.value) {
+			// When muting: save current volume if it's > 0, otherwise keep the previous saved volume
+			// This prevents losing the previous non-zero volume if user had manually set volume to 0
+			prevVolume.value = volume.value > 0 ? volume.value : prevVolume.value;
+			volume.value = 0;
+		} else {
+			volume.value = prevVolume.value;
+		}
+		store.commit("settings/UPDATE", { muted: isMuted.value });
+	});
+
+	return { volume, prevVolume, isMuted };
 }
 
 export interface MediaPlayer {
@@ -35,19 +59,31 @@ export interface MediaPlayer {
 	setPosition(position: number): void;
 
 	isCaptionsSupported(): boolean;
+	isQualitySupported(): boolean;
 	getAvailablePlaybackRates(): number[];
+}
+
+export interface MediaPlayerWithAudioBoost extends MediaPlayer {
+	setAudioBoost(boost: number): void;
 }
 
 export interface MediaPlayerWithCaptions extends MediaPlayer {
 	isCaptionsEnabled(): boolean;
 	setCaptionsEnabled(enabled: boolean): void;
-	getCaptionsTracks(): string[];
-	setCaptionsTrack(track: string): void;
+	getCaptionsTracks(): CaptionTrack[];
+	setCaptionsTrack(track: number): void;
 }
 
 export interface MediaPlayerWithPlaybackRate extends MediaPlayer {
 	getPlaybackRate(): number;
 	setPlaybackRate(rate: number): void;
+}
+
+export interface MediaPlayerWithQuality extends MediaPlayer {
+	getVideoTracks(): VideoTrack[];
+	setVideoTrack(idx: number): void;
+	isAutoQualitySupported(): boolean;
+	getCurrentActiveQuality(): number | null;
 }
 
 export class MediaPlayerV2 {
@@ -113,7 +149,7 @@ export class MediaPlayerV2 {
 		if (!this.checkForPlayer(this.player.value)) {
 			return;
 		}
-		return this.player.value.setPosition(position);
+		this.player.value.setPosition(position);
 	}
 }
 
@@ -126,8 +162,8 @@ export function useMediaPlayer() {
 
 const isCaptionsSupported: Ref<boolean> = ref(false);
 const isCaptionsEnabled: Ref<boolean> = ref(false);
-const captionsTracks: Ref<string[]> = ref([]);
-const currentTrack: Ref<string | null> = ref(null);
+const captionsTracks: Ref<CaptionTrack[]> = ref([]);
+const currentTrack: Ref<number | null> = ref(null);
 
 export function useCaptions() {
 	return {
@@ -135,6 +171,22 @@ export function useCaptions() {
 		isCaptionsEnabled,
 		captionsTracks,
 		currentTrack,
+	};
+}
+
+const isQualitySupported: Ref<boolean> = ref(false);
+const videoTracks: Ref<VideoTrack[]> = ref([]);
+const currentVideoTrack: Ref<number> = ref(-1);
+const isAutoQualitySupported: Ref<boolean> = ref(false);
+const currentActiveQuality: Ref<number | null> = ref(null);
+
+export function useQualities() {
+	return {
+		isQualitySupported,
+		videoTracks,
+		currentVideoTrack,
+		isAutoQualitySupported,
+		currentActiveQuality,
 	};
 }
 
@@ -150,4 +202,9 @@ export function usePlaybackRate() {
 		playbackRate,
 		availablePlaybackRates,
 	};
+}
+
+export interface MediaPlayerError {
+	type: "unknown";
+	message?: string;
 }

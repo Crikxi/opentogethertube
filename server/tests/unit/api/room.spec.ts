@@ -3,25 +3,26 @@ import {
 	it,
 	expect,
 	beforeAll,
-	beforeEach,
 	afterAll,
 	afterEach,
 	vi,
-	MockInstance,
+	type MockInstance,
 } from "vitest";
 import _ from "lodash";
-import { AuthToken, QueueMode, Visibility } from "ott-common/models/types";
+import { type AuthToken, QueueMode, Visibility } from "ott-common/models/types.js";
 import request from "supertest";
-import tokens from "../../../../server/auth/tokens";
-import roommanager from "../../../../server/roommanager";
-import { RoomNotFoundException } from "../../../../server/exceptions";
-import { main } from "../../../app";
-import { Room as RoomModel, User as UserModel } from "../../../models";
-import usermanager from "../../../usermanager";
-import { OttApiRequestRoomCreate } from "ott-common/models/rest-api";
-import { conf } from "../../../../server/ott-config";
-import { User } from "../../../models/user";
-import { UnloadReason } from "../../../generated";
+import tokens from "../../../../server/auth/tokens.js";
+import roommanager from "../../../../server/roommanager.js";
+import { RoomNotFoundException } from "../../../../server/exceptions.js";
+import { main } from "../../../app.js";
+import { Room as RoomModel } from "../../../models/index.js";
+import usermanager from "../../../usermanager.js";
+import type { OttApiRequestRoomCreate } from "ott-common/models/rest-api.js";
+import { conf } from "../../../../server/ott-config.js";
+import type { User } from "../../../models/user.js";
+import { UnloadReason } from "../../../generated.js";
+
+const JSON_CONTENT_TYPE_REGEX = /json/;
 
 expect.extend({
 	toBeRoomNotFound(error) {
@@ -31,7 +32,7 @@ expect.extend({
 				pass: false,
 			};
 		}
-		let pass = this.equals(error, {
+		const pass = this.equals(error, {
 			name: "RoomNotFoundException",
 			message: "Room not found",
 		});
@@ -56,7 +57,7 @@ expect.extend({
 				pass: false,
 			};
 		}
-		let pass =
+		const pass =
 			this.equals(error, {
 				name: "Unknown",
 				message: "Failed to get room",
@@ -127,38 +128,38 @@ describe("Room API", () => {
 			}
 		});
 
-		it.each([Visibility.Public, Visibility.Unlisted])(
-			"should get %s room metadata",
-			async (visibility: Visibility) => {
-				await roommanager.createRoom({
-					name: "test1",
-					isTemporary: true,
-					visibility: visibility,
-				});
+		it.each([
+			Visibility.Public,
+			Visibility.Unlisted,
+		])("should get %s room metadata", async (visibility: Visibility) => {
+			await roommanager.createRoom({
+				name: "test1",
+				isTemporary: true,
+				visibility: visibility,
+			});
 
-				let resp = await request(app)
-					.get("/api/room/test1")
-					.auth(token, { type: "bearer" })
-					.set({ Authorization: "Bearer foobar" })
-					.expect("Content-Type", /json/)
-					.expect(200);
-
-				// TODO: This is currently not type-checked. Ideally, we would be able to type-check the response using a definition from `common`.
-				expect(resp.body).toMatchObject({
-					name: "test1",
-					title: "",
-					description: "",
-					queueMode: QueueMode.Manual,
-					visibility: visibility,
-				});
-			}
-		);
-
-		it("should fail if the room does not exist", async () => {
-			let resp = await request(app)
+			const resp = await request(app)
 				.get("/api/room/test1")
 				.auth(token, { type: "bearer" })
-				.expect("Content-Type", /json/)
+				.set({ Authorization: "Bearer foobar" })
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
+				.expect(200);
+
+			// TODO: This is currently not type-checked. Ideally, we would be able to type-check the response using a definition from `common`.
+			expect(resp.body).toMatchObject({
+				name: "test1",
+				title: "",
+				description: "",
+				queueMode: QueueMode.Manual,
+				visibility: visibility,
+			});
+		});
+
+		it("should fail if the room does not exist", async () => {
+			const resp = await request(app)
+				.get("/api/room/test1")
+				.auth(token, { type: "bearer" })
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
 				.expect(404);
 			expect(resp.body.success).toEqual(false);
 			expect(resp.body.error).toBeRoomNotFound();
@@ -196,23 +197,23 @@ describe("Room API", () => {
 			}
 		});
 
-		it.each([Visibility.Public, Visibility.Unlisted])(
-			"should create %s room",
-			async (visibility: Visibility) => {
-				let resp = await request(app)
-					.post("/api/room/create")
-					.auth(token, { type: "bearer" })
-					.send({ name: "test1", isTemporary: true, visibility: visibility })
-					.expect("Content-Type", /json/)
-					.expect(201);
-				expect(resp.body.success).toBe(true);
-				expect(roommanager.rooms[0]).toMatchObject({
-					name: "test1",
-					isTemporary: true,
-					visibility: visibility,
-				});
-			}
-		);
+		it.each([
+			Visibility.Public,
+			Visibility.Unlisted,
+		])("should create %s room", async (visibility: Visibility) => {
+			const resp = await request(app)
+				.post("/api/room/create")
+				.auth(token, { type: "bearer" })
+				.send({ name: "test1", isTemporary: true, visibility: visibility })
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
+				.expect(201);
+			expect(resp.body.success).toBe(true);
+			expect(roommanager.rooms[0]).toMatchObject({
+				name: "test1",
+				isTemporary: true,
+				visibility: visibility,
+			});
+		});
 
 		it.each([
 			[{ isTemporary: true }],
@@ -238,13 +239,27 @@ describe("Room API", () => {
 					isTemporary: true,
 				},
 			],
+			[
+				{
+					name: "test2",
+					title: "Title with\nnewline",
+					isTemporary: true,
+				},
+			],
+			[
+				{
+					name: "test3",
+					title: "Title with\r\ncarriage return",
+					isTemporary: true,
+				},
+			],
 			[{ name: "test1", isTemporary: true, visibility: "invalid" }],
 		])("should fail to create room for validation errors: %s", async body => {
-			let resp = await request(app)
+			const resp = await request(app)
 				.post("/api/room/create")
 				.auth(token, { type: "bearer" })
 				.send(body)
-				.expect("Content-Type", /json/)
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
 				.expect(400);
 			expect(resp.body.success).toEqual(false);
 			expect(resp.body.error).toMatchObject({
@@ -253,11 +268,11 @@ describe("Room API", () => {
 		});
 
 		it("should create permanent room without owner", async () => {
-			let resp = await request(app)
+			const resp = await request(app)
 				.post("/api/room/create")
 				.auth(token, { type: "bearer" })
 				.send({ name: "testnoowner", isTemporary: false })
-				.expect("Content-Type", /json/)
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
 				.expect(201);
 			expect(resp.body.success).toEqual(true);
 			expect(roommanager.rooms[0]).toMatchObject({
@@ -273,11 +288,11 @@ describe("Room API", () => {
 				isLoggedIn: true,
 				user_id: owner.id,
 			});
-			let resp = await request(app)
+			const resp = await request(app)
 				.post("/api/room/create")
 				.auth(token, { type: "bearer" })
 				.send({ name: "testowner" })
-				.expect("Content-Type", /json/)
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
 				.expect(201);
 			expect(resp.body.success).toEqual(true);
 			expect(_.pick(roommanager.rooms[0], "name", "owner.id", "owner.email")).toMatchObject({
@@ -299,7 +314,7 @@ describe("Room API", () => {
 
 		for (const [path, body] of requests) {
 			it(`should fail to create room if feature is disabled: Endpoint ${path} body ${JSON.stringify(
-				body
+				body,
 			)}`, async () => {
 				conf.set("room.enable_create_temporary", false);
 				conf.set("room.enable_create_permanent", false);
@@ -308,7 +323,7 @@ describe("Room API", () => {
 					.post(path)
 					.auth(token, { type: "bearer" })
 					.send(body)
-					.expect("Content-Type", /json/)
+					.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
 					.expect(403);
 				expect(resp.body.success).toEqual(false);
 				expect(resp.body.error).toMatchObject({
@@ -356,15 +371,25 @@ describe("Room API", () => {
 			],
 			[
 				{
+					title: "Title with\nnewline",
+				},
+			],
+			[
+				{
+					title: "Title with\r\ncarriage return newline",
+				},
+			],
+			[
+				{
 					autoSkipSegmentCategories: ["invalid", "intro"],
 				},
 			],
 		])("should fail to modify room for validation errors: %s", async body => {
-			let resp = await request(app)
+			const resp = await request(app)
 				.patch("/api/room/foo")
 				.auth(token, { type: "bearer" })
 				.send(body)
-				.expect("Content-Type", /json/)
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
 				.expect(400);
 			expect(resp.body.success).toEqual(false);
 			expect(resp.body.error).toMatchObject({
@@ -399,23 +424,128 @@ describe("Room API", () => {
 				],
 			],
 			[[], []],
-		])(
-			"should update autoSkipSegmentCategories with only unique valid auto-skip segment categories",
-			async (requestAutoSkipSegmentCategories, savedAutoSkipSegmentCategories) => {
-				let resp = await request(app)
-					.patch("/api/room/foo")
-					.auth(token, { type: "bearer" })
-					.send({
-						autoSkipSegmentCategories: requestAutoSkipSegmentCategories,
-					})
-					.expect("Content-Type", /json/)
-					.expect(200);
-				expect(resp.body.success).toEqual(true);
-				const roomResult = await roommanager.getRoom("foo");
-				expect(_.pick(roomResult.value, "autoSkipSegmentCategories")).toMatchObject({
-					autoSkipSegmentCategories: savedAutoSkipSegmentCategories,
-				});
+		])("should update autoSkipSegmentCategories with only unique valid auto-skip segment categories", async (requestAutoSkipSegmentCategories, savedAutoSkipSegmentCategories) => {
+			const resp = await request(app)
+				.patch("/api/room/foo")
+				.auth(token, { type: "bearer" })
+				.send({
+					autoSkipSegmentCategories: requestAutoSkipSegmentCategories,
+				})
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
+				.expect(200);
+			expect(resp.body.success).toEqual(true);
+			const roomResult = await roommanager.getRoom("foo");
+			expect(_.pick(roomResult.value, "autoSkipSegmentCategories")).toMatchObject({
+				autoSkipSegmentCategories: savedAutoSkipSegmentCategories,
+			});
+		});
+	});
+
+	describe("PATCH /api/room/:name/queue", () => {
+		let getSessionInfoSpy: MockInstance;
+		let validateSpy: MockInstance;
+
+		beforeAll(async () => {
+			getSessionInfoSpy = vi.spyOn(tokens, "getSessionInfo").mockResolvedValue({
+				isLoggedIn: false,
+				username: "test",
+			});
+			validateSpy = vi.spyOn(tokens, "validate").mockResolvedValue(true);
+		});
+
+		afterAll(() => {
+			getSessionInfoSpy.mockRestore();
+			validateSpy.mockRestore();
+		});
+
+		afterEach(async () => {
+			try {
+				await roommanager.unloadRoom("testqueue", UnloadReason.Admin);
+			} catch (e) {
+				if (!(e instanceof RoomNotFoundException)) {
+					throw e;
+				}
 			}
-		);
+		});
+
+		it("should update a queue item's subtitleUrl", async () => {
+			await roommanager.createRoom({
+				name: "testqueue",
+				isTemporary: true,
+			});
+			const room = (await roommanager.getRoom("testqueue")).unwrap();
+			await room.queue.enqueue({ service: "direct", id: "foo" });
+
+			const resp = await request(app)
+				.patch("/api/room/testqueue/queue")
+				.auth(token, { type: "bearer" })
+				.set({ Authorization: "Bearer foobar" })
+				.send({
+					service: "direct",
+					id: "foo",
+					subtitleUrl: "https://example.com/subtitles.vtt",
+				})
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
+				.expect(200);
+
+			expect(resp.body.success).toEqual(true);
+
+			const updatedRoom = (await roommanager.getRoom("testqueue")).unwrap();
+			expect(updatedRoom.queue.items).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						service: "direct",
+						id: "foo",
+						subtitleUrl: "https://example.com/subtitles.vtt",
+					}),
+				]),
+			);
+		});
+
+		it("should fail if the subtitleUrl does not end with .vtt", async () => {
+			await roommanager.createRoom({
+				name: "testqueue",
+				isTemporary: true,
+			});
+			const room = (await roommanager.getRoom("testqueue")).unwrap();
+			await room.queue.enqueue({ service: "direct", id: "foo" });
+
+			const resp = await request(app)
+				.patch("/api/room/testqueue/queue")
+				.auth(token, { type: "bearer" })
+				.set({ Authorization: "Bearer foobar" })
+				.send({
+					service: "direct",
+					id: "foo",
+					subtitleUrl: "https://example.com/subtitles.srt",
+				})
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
+				.expect(400);
+
+			expect(resp.body.success).toEqual(false);
+			expect(resp.body.error).toMatchObject({
+				name: "UnsupportedSubtitleType",
+			});
+		});
+
+		it("should fail if the request body is invalid", async () => {
+			await roommanager.createRoom({
+				name: "testqueue",
+				isTemporary: true,
+			});
+
+			const resp = await request(app)
+				.patch("/api/room/testqueue/queue")
+				.auth(token, { type: "bearer" })
+				.set({ Authorization: "Bearer foobar" })
+				.send({ service: "direct", id: "foo", subtitleUrl: 123 })
+				.expect("Content-Type", JSON_CONTENT_TYPE_REGEX)
+				.expect(400);
+
+			expect(resp.body.success).toEqual(false);
+			expect(resp.body.error).toMatchObject({
+				name: "ZodValidationError",
+			});
+		});
 	});
 });

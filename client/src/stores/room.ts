@@ -1,11 +1,10 @@
 import _ from "lodash";
-import { Module } from "vuex/types";
-import Vuex from "vuex";
+import type { Module } from "vuex/types";
 import { Grants } from "ott-common/permissions";
-import { QueueMode } from "ott-common/models/types";
-import { QueueItem } from "ott-common/models/video";
-import dayjs, { Dayjs } from "dayjs";
-import { ServerMessageSync } from "ott-common/models/messages";
+import { QueueMode, Visibility } from "ott-common/models/types";
+import type { QueueItem } from "ott-common/models/video";
+import dayjs, { type Dayjs } from "dayjs";
+import type { ServerMessageSync } from "ott-common/models/messages";
 import { deserializeMap, deserializeSet } from "ott-common/serialize";
 import type { FullOTTStoreState } from "@/store";
 
@@ -14,6 +13,7 @@ export interface RoomState {
 	title: string;
 	description: string;
 	isTemporary: boolean;
+	visibility: Visibility;
 	queueMode: QueueMode;
 	currentSource: QueueItem | null;
 	queue: QueueItem[];
@@ -42,6 +42,7 @@ export const roomModule: Module<RoomState, FullOTTStoreState> = {
 		title: "",
 		description: "",
 		isTemporary: false,
+		visibility: Visibility.Unlisted,
 		queueMode: QueueMode.Manual,
 		currentSource: {} as QueueItem,
 		queue: [],

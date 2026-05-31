@@ -1,26 +1,24 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import clientmanager, {
 	parseWebsocketConnectionUrl,
 	setupBalancerManager,
-} from "../../clientmanager";
+} from "../../clientmanager.js";
 import {
 	BalancerConnection,
-	BalancerConnectionEventHandlers,
-	BalancerConnectionEvents,
-	BalancerConnectionReal,
-	MsgM2B,
+	type BalancerConnectionEventHandlers,
+	type BalancerConnectionEvents,
+	type MsgM2B,
 	balancerManager,
-} from "../../balancer";
-import { BalancerClient, Client } from "../../client";
-import { OttWebsocketError } from "ott-common/models/types";
-import { buildClients } from "../../redisclient";
-import { Result, ok } from "ott-common/result";
-import roommanager from "../../roommanager";
-import { loadModels } from "../../models";
+} from "../../balancer.js";
+import { BalancerClient, Client } from "../../client.js";
+import type { OttWebsocketError } from "ott-common/models/types.js";
+import { buildClients } from "../../redisclient.js";
+import { type Result, ok } from "ott-common/result.js";
+import roommanager from "../../roommanager.js";
+import { loadModels } from "../../models/index.js";
 import type { Request } from "express";
-import { loadConfigFile, conf } from "../../ott-config";
-import { M2BInit, UnloadReason, type MsgB2M } from "../../generated";
-import { v4 as uuidv4 } from "uuid";
+import { loadConfigFile, conf } from "../../ott-config.js";
+import { type M2BInit, UnloadReason, type MsgB2M } from "../../generated.js";
 
 class TestClient extends Client {
 	sendRawMock = vi.fn();
@@ -187,9 +185,9 @@ describe("ClientManager", () => {
 		const client4 = new BalancerClient("foo", "bar", mockBalancerCon2);
 		const client5 = new BalancerClient("foo", "foo2", mockBalancerCon);
 		const clients = [client1, client2, client3, client4, client5];
-		for (let [i, client] of clients.entries()) {
+		for (const [i, client] of clients.entries()) {
 			clientmanager.addClient(client);
-			client.emit("auth", client, "token" + i, { isLoggedIn: false, username: "foo" + i });
+			client.emit("auth", client, `token${i}`, { isLoggedIn: false, username: `foo${i}` });
 		}
 		await new Promise(resolve => setTimeout(resolve, 100));
 		const joins = clientmanager.getClientsInRoom("foo");

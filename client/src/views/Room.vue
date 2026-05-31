@@ -14,7 +14,7 @@
 			<div class="room-header" v-if="!store.state.fullscreen">
 				<h1 class="room-title">
 					{{
-						store.state.room.title != ""
+						store.state.room.title !== ""
 							? store.state.room.title
 							: store.state.room.isTemporary
 							? $t("room.title-temp")
@@ -23,11 +23,28 @@
 				</h1>
 				<ClientSettingsDialog />
 				<div class="grow"><!-- Spacer --></div>
-				<span id="connectStatus">{{ connectionStatus }}</span>
+				<div class="room-status">
+					<v-btn
+						class="room-visibility-badge"
+						data-cy="room-visibility"
+						variant="plain"
+						size="default"
+						slim
+						:prepend-icon="roomVisibilityIcon"
+						@click="onVisibilityClick"
+					>
+						{{ roomVisibilityLabel }}
+						<v-tooltip activator="parent" location="top">
+							{{ $t("room.visibility-badge-label") }}
+						</v-tooltip>
+					</v-btn>
+					<v-icon :icon="mdiCircle" :color="connectionStatusColor" size="small" start />
+					<span id="connectStatus">{{ connectionStatus }}</span>
+				</div>
 			</div>
 			<div class="video-container">
 				<div class="video-subcontainer">
-					<div class="player-container">
+					<div class="player-container" ref="playerContainer">
 						<OmniPlayer
 							:source="store.state.room.currentSource"
 							@apiready="onPlayerApiReady"
@@ -41,7 +58,7 @@
 						</div>
 						<div class="playback-blocked-prompt" v-if="mediaPlaybackBlocked">
 							<v-btn
-								prepend-icon="mdi-play"
+								:prepend-icon="mdiPlay"
 								size="x-large"
 								color="warning"
 								@click="onClickUnblockPlayback"
@@ -73,7 +90,7 @@
 				<div class="under-video-tabs">
 					<v-tabs fixed-tabs v-model="queueTab" color="primary">
 						<v-tab>
-							<v-icon>mdi-format-list-bulleted</v-icon>
+							<v-icon :icon="mdiFormatListBulleted" />
 							<span class="tab-text">{{ $t("room.tabs.queue") }}</span>
 							<v-chip size="x-small">
 								{{
@@ -84,11 +101,11 @@
 							</v-chip>
 						</v-tab>
 						<v-tab>
-							<v-icon>mdi-plus</v-icon>
+							<v-icon :icon="mdiPlus" />
 							<span class="tab-text">{{ $t("common.add") }}</span>
 						</v-tab>
 						<v-tab>
-							<v-icon>mdi-wrench</v-icon>
+							<v-icon :icon="mdiWrench" />
 							<span class="tab-text">{{ $t("room.tabs.settings") }}</span>
 						</v-tab>
 					</v-tabs>
@@ -126,15 +143,15 @@
 								{{
 									Array.from(
 										{ length: store.state.playerBufferSpans.length },
-										(v, k) => k++
+										(v, k) => k++,
 									)
 										.map(
 											i =>
 												`${i}: [${secondsToTimestamp(
-													store.state.playerBufferSpans?.start(i) ?? 0
+													store.state.playerBufferSpans?.start(i) ?? 0,
 												)} => ${secondsToTimestamp(
-													store.state.playerBufferSpans?.end(i) ?? 0
-												)}]`
+													store.state.playerBufferSpans?.end(i) ?? 0,
+												)}]`,
 										)
 										.join(" ")
 								}}
@@ -194,9 +211,19 @@
 
 <script lang="ts">
 import {
+	mdiPlay,
+	mdiFormatListBulleted,
+	mdiPlus,
+	mdiWrench,
+	mdiEarth,
+	mdiEyeOff,
+	mdiLock,
+	mdiCircle,
+} from "@mdi/js";
+import {
 	defineComponent,
 	ref,
-	Ref,
+	type Ref,
 	unref,
 	computed,
 	watch,
@@ -204,6 +231,7 @@ import {
 	onUnmounted,
 	nextTick,
 	provide,
+	useTemplateRef,
 } from "vue";
 import AddPreview from "@/components/AddPreview.vue";
 import { calculateCurrentPosition } from "ott-common/timestamp";
@@ -225,8 +253,8 @@ import WorkaroundUserStateNotifier from "@/components/WorkaroundUserStateNotifie
 import { useStore } from "@/store";
 import { useI18n } from "vue-i18n";
 import { useRouter, useRoute } from "vue-router";
-import { ServerMessageSync } from "ott-common/models/messages";
-import { useScreenOrientation, useMouse } from "@vueuse/core";
+import type { ServerMessageSync } from "ott-common/models/messages";
+import { useScreenOrientation, useMouseInElement } from "@vueuse/core";
 import { KeyboardShortcuts, RoomKeyboardShortcutsKey } from "@/util/keyboard-shortcuts";
 import VideoControls from "@/components/controls/VideoControls.vue";
 import RestoreQueue from "@/components/RestoreQueue.vue";
@@ -237,9 +265,11 @@ import { secondsToTimestamp } from "@/util/timestamp";
 import { useCaptions, useMediaPlayer, useVolume } from "@/components/composables";
 import { useGrants } from "@/components/composables/grants";
 import { isOfficialSite } from "@/util/misc";
+import { Visibility } from "ott-common/models/types";
 
 const VIDEO_CONTROLS_HIDE_TIMEOUT = 3000;
 
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
 export default defineComponent({
 	name: "room",
 	components: {
@@ -270,7 +300,9 @@ export default defineComponent({
 		// video control visibility
 		const controlsVisible = ref(true);
 		const videoControlsHideTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
-		const mouse = useMouse();
+		const playerContainer = useTemplateRef<HTMLDivElement>("playerContainer");
+		const mouse = useMouseInElement(playerContainer);
+		const isIframeBasedPlayer = ref(false);
 
 		function setVideoControlsVisibility(visible: boolean) {
 			controlsVisible.value = visible;
@@ -296,11 +328,17 @@ export default defineComponent({
 				setVideoControlsVisibility(true);
 				return;
 			}
+
+			// For non-iframe players, only show controls when mouse is inside the player
+			if (!isIframeBasedPlayer.value && mouse.isOutside.value) {
+				return;
+			}
+
 			activateVideoControls();
 		});
 
 		const controlsMode = computed(() =>
-			currentSource.value?.service === "youtube" ? "outside-video" : "in-video"
+			currentSource.value?.service === "youtube" ? "outside-video" : "in-video",
 		);
 
 		// actively calculate the current position of the video
@@ -319,13 +357,13 @@ export default defineComponent({
 						store.state.room.playbackStartTime,
 						new Date(),
 						store.state.room.playbackPosition,
-						store.state.room.playbackSpeed
+						store.state.room.playbackSpeed,
 				  )
 				: store.state.room.playbackPosition;
 			sliderPosition.value = _.clamp(
 				truePosition.value,
 				0,
-				store.state.room.currentSource?.length ?? 0
+				store.state.room.currentSource?.length ?? 0,
 			);
 		}
 
@@ -362,6 +400,9 @@ export default defineComponent({
 				? t("room.con-status.connected")
 				: t("room.con-status.connecting");
 		});
+		const connectionStatusColor = computed(() =>
+			connection.connected.value ? "success" : "warning",
+		);
 		const showDisconnectedOverlay = computed(() => !!connection.kickReason.value);
 
 		function rewriteUrlToRoomName() {
@@ -370,7 +411,7 @@ export default defineComponent({
 			}
 			if (route.params.roomId !== store.state.room.name) {
 				console.debug(
-					`room name does not match URL, rewriting to "${store.state.room.name}"`
+					`room name does not match URL, rewriting to "${store.state.room.name}"`,
 				);
 				router.replace({
 					name: "room",
@@ -477,7 +518,7 @@ export default defineComponent({
 
 		function seekDelta(delta: number) {
 			roomapi.seek(
-				_.clamp(truePosition.value + delta, 0, store.state.room.currentSource?.length ?? 0)
+				_.clamp(truePosition.value + delta, 0, store.state.room.currentSource?.length ?? 0),
 			);
 		}
 
@@ -533,6 +574,8 @@ export default defineComponent({
 			if (currentSource.value?.service === "vimeo") {
 				onPlayerReadyVimeo();
 			}
+			isIframeBasedPlayer.value = !!playerContainer.value?.querySelector("iframe");
+			console.log("isIframeBasedPlayer:", isIframeBasedPlayer.value);
 		}
 		async function onPlayerReadyVimeo() {
 			await applyIsPlaying(store.state.room.isPlaying);
@@ -548,7 +591,7 @@ export default defineComponent({
 
 		// misc UI stuff
 		const isMobile = computed(
-			() => window.matchMedia("only screen and (max-width: 760px)").matches
+			() => window.matchMedia("only screen and (max-width: 760px)").matches,
 		);
 		const orientation = useScreenOrientation();
 		const queueTab = ref(0);
@@ -624,7 +667,7 @@ export default defineComponent({
 
 					seekDelta(seekIncrement);
 				}
-			}
+			},
 		);
 		shortcuts.bind({ code: "Home" }, () => {
 			if (granted("playback.seek")) {
@@ -637,7 +680,11 @@ export default defineComponent({
 			}
 		});
 		shortcuts.bind([{ code: "ArrowUp" }, { code: "ArrowDown" }], (e: KeyboardEvent) => {
-			volume.value = _.clamp(volume.value + 5 * (e.code === "ArrowDown" ? -1 : 1), 0, 100);
+			volume.volume.value = _.clamp(
+				volume.volume.value + 5 * (e.code === "ArrowDown" ? -1 : 1),
+				0,
+				100,
+			);
 		});
 		shortcuts.bind({ code: "F12", ctrlKey: true, shiftKey: true }, () => {
 			debugMode.value = !debugMode.value;
@@ -654,6 +701,45 @@ export default defineComponent({
 		onUnmounted(() => {
 			window.removeEventListener("keydown", onKeyDown);
 		});
+
+		const roomVisibility = computed(() => store.state.room.visibility);
+
+		const roomVisibilityIcon = computed(() => {
+			switch (roomVisibility.value) {
+				case Visibility.Public:
+					return mdiEarth;
+				case Visibility.Unlisted:
+					return mdiEyeOff;
+				case Visibility.Private:
+					return mdiLock;
+				default:
+					return mdiEyeOff;
+			}
+		});
+
+		const roomVisibilityLabel = computed(() => {
+			switch (roomVisibility.value) {
+				case Visibility.Public:
+					return t("room-settings.public");
+				case Visibility.Unlisted:
+					return t("room-settings.unlisted");
+				case Visibility.Private:
+					return t("room-settings.private");
+				default:
+					return "This is a bug";
+			}
+		});
+
+		async function onVisibilityClick() {
+			queueTab.value = 2;
+			await nextTick();
+			if (roomSettingsForm.value) {
+				await roomSettingsForm.value.loadRoomSettings();
+				await nextTick();
+				roomSettingsForm.value.openVisibilityMenu();
+				goTo(roomSettingsForm.value.$el);
+			}
+		}
 
 		// small helper aliases
 		const currentSource = computed(() => store.state.room.currentSource);
@@ -685,6 +771,7 @@ export default defineComponent({
 
 			isConnected,
 			connectionStatus,
+			connectionStatusColor,
 			showDisconnectedOverlay,
 
 			player,
@@ -711,13 +798,25 @@ export default defineComponent({
 			mediaPlaybackBlocked,
 			onClickUnblockPlayback,
 			secondsToTimestamp,
+
+			roomVisibilityIcon,
+			roomVisibilityLabel,
+			onVisibilityClick,
+
+			// MDI Icons
+			mdiPlay,
+			mdiFormatListBulleted,
+			mdiPlus,
+			mdiWrench,
+			mdiCircle,
 		};
 	},
 });
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
-@import "../variables.scss";
+@use "../variables.scss";
 
 $video-player-max-height: 75vh;
 $video-player-max-height-theater: 90vh;
@@ -748,7 +847,7 @@ $in-video-chat-width-small: 250px;
 		width: 80%;
 		justify-self: center;
 
-		@media (max-width: $md-max) {
+		@media (max-width: variables.$md-max) {
 			width: 100%;
 		}
 	}
@@ -793,12 +892,12 @@ $in-video-chat-width-small: 250px;
 	padding: 5px 10px;
 
 	position: absolute;
-	bottom: $video-controls-height;
+	bottom: variables.$video-controls-height;
 	right: 0;
 	width: $in-video-chat-width;
 	height: 70%;
 	min-height: 70px;
-	@media screen and (max-width: $sm-max) {
+	@media screen and (max-width: variables.$sm-max) {
 		width: $in-video-chat-width-small;
 	}
 	pointer-events: none;
@@ -812,7 +911,7 @@ $in-video-chat-width-small: 250px;
 	padding: 5px 10px;
 	height: 300px;
 	min-height: 100px;
-	@media screen and (max-width: $sm-max) {
+	@media screen and (max-width: variables.$sm-max) {
 		width: $in-video-chat-width-small;
 	}
 	pointer-events: none;
@@ -846,7 +945,7 @@ $in-video-chat-width-small: 250px;
 .tab-text {
 	margin: 0 8px;
 
-	@media screen and (max-width: $sm-max) {
+	@media screen and (max-width: variables.$sm-max) {
 		display: none;
 	}
 }
@@ -871,7 +970,7 @@ $in-video-chat-width-small: 250px;
 }
 
 .room {
-	@media (max-width: $md-max) {
+	@media (max-width: variables.$md-max) {
 		padding: 0;
 	}
 }
@@ -917,7 +1016,7 @@ $in-video-chat-width-small: 250px;
 	display: flex;
 	width: 100%;
 
-	@media screen and (max-width: $sm-max) {
+	@media screen and (max-width: variables.$sm-max) {
 		flex-direction: column;
 	}
 }
@@ -926,8 +1025,16 @@ $in-video-chat-width-small: 250px;
 	flex-grow: 1;
 	width: 60%;
 
-	@media screen and (max-width: $sm-max) {
+	@media screen and (max-width: variables.$sm-max) {
 		width: 100%;
 	}
+}
+
+.room-status {
+	display: flex;
+	align-items: center;
+	text-transform: uppercase;
+	font-size: 14px;
+	font-weight: 500;
 }
 </style>

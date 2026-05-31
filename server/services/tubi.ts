@@ -1,11 +1,16 @@
-import { URL } from "url";
 import axios from "axios";
-import { getLogger } from "../logger";
-import { ServiceAdapter, VideoRequest } from "../serviceadapter";
-import { Video, VideoMetadata, VideoService } from "ott-common/models/video";
-import { conf } from "../ott-config";
+import type { Video, VideoMetadata, VideoService } from "ott-common/models/video.js";
+import { URL } from "node:url";
+import { getLogger } from "../logger.js";
+import { conf } from "../ott-config.js";
+import { ServiceAdapter } from "../serviceadapter.js";
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const log = getLogger("tubi");
+const TUBI_URL_REGEX =
+	/https?:\/\/(?:www\.)?tubitv\.com\/(?:video|movies|tv-shows|oz\/videos|series)\/([0-9]+)/;
+const NUMERIC_ID_REGEX = /^\d+$/;
+const TUBI_SERIES_DATA_REGEX = /window\.__data\s*=\s*({.+?});\s*<\/script>/;
 
 interface TubiVideoResponse {
 	id: string;
@@ -59,9 +64,7 @@ export default class TubiAdapter extends ServiceAdapter {
 	}
 
 	canHandleURL(link: string): boolean {
-		return /https?:\/\/(?:www\.)?tubitv\.com\/(?:video|movies|tv-shows|oz\/videos|series)\/([0-9]+)/.test(
-			link
-		);
+		return TUBI_URL_REGEX.test(link);
 	}
 
 	isCollectionURL(link: string): boolean {
@@ -92,28 +95,34 @@ export default class TubiAdapter extends ServiceAdapter {
 		};
 	}
 
-	async fetchVideoInfo(id: string, properties?: (keyof VideoMetadata)[]): Promise<Video> {
-		let resp = await this.api.get(`https://tubitv.com/oz/videos/${id}/content`);
-		let data = resp.data as TubiVideoResponse;
+	async fetchVideoInfo(id: string, _properties?: (keyof VideoMetadata)[]): Promise<Video> {
+		if (!NUMERIC_ID_REGEX.test(id)) {
+			throw new Error(`Invalid Tubi video id: ${id}`);
+		}
+		const resp = await this.api.get(`https://tubitv.com/oz/videos/${id}/content`);
+		const data = resp.data as TubiVideoResponse;
 		return this.extractVideo(data);
 	}
 
 	async fetchSeriesInfo(id: string): Promise<Video[]> {
-		let resp = await this.api.get(`https://tubitv.com/series/${id}`);
-		let match = /window\.__data\s*=\s*({.+?});\s*<\/script>/.exec(resp.data)?.[1];
+		if (!NUMERIC_ID_REGEX.test(id)) {
+			throw new Error(`Invalid Tubi series id: ${id}`);
+		}
+		const resp = await this.api.get(`https://tubitv.com/series/${id}`);
+		const match = TUBI_SERIES_DATA_REGEX.exec(resp.data)?.[1];
 		if (!match) {
 			throw new Error(`Unable to get series info from ${id}`);
 		}
 
-		let corrected = match.split(":undefined").join(":null"); // because replaceAll isn't available here?
-		let data = JSON.parse(corrected) as TubiSeriesInfo;
+		const corrected = match.split(":undefined").join(":null"); // because replaceAll isn't available here?
+		const data = JSON.parse(corrected) as TubiSeriesInfo;
 
-		let videos: Video[] = [];
+		const videos: Video[] = [];
 		// sometimes the id has an extra zero prepended? weird
-		let series = (data.video.byId[`0${id}`] ?? data.video.byId[id]) as TubiSeries;
-		for (let season of series.seasons) {
-			for (let episode of season.episodeIds) {
-				let video = data.video.byId[episode] as TubiVideoResponse;
+		const series = (data.video.byId[`0${id}`] ?? data.video.byId[id]) as TubiSeries;
+		for (const season of series.seasons) {
+			for (const episode of season.episodeIds) {
+				const video = data.video.byId[episode] as TubiVideoResponse;
 				videos.push(this.extractVideo(video));
 			}
 		}
@@ -123,10 +132,10 @@ export default class TubiAdapter extends ServiceAdapter {
 
 	async resolveURL(url: string): Promise<Video[]> {
 		if (this.isCollectionURL(url)) {
-			let path = new URL(url).pathname.split("/");
+			const path = new URL(url).pathname.split("/");
 			return await this.fetchSeriesInfo(path[2]);
 		} else {
-			let id = this.getVideoId(url);
+			const id = this.getVideoId(url);
 			return [await this.fetchVideoInfo(id)];
 		}
 	}

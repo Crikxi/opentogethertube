@@ -1,15 +1,17 @@
-import { URL } from "url";
-import axios, { AxiosError, AxiosResponse } from "axios";
-import { ServiceAdapter } from "../serviceadapter";
+import { URL } from "node:url";
+import axios, { type AxiosResponse } from "axios";
+import { ServiceAdapter } from "../serviceadapter.js";
 import {
 	ServiceLinkParseException,
 	InvalidVideoIdException,
 	OutOfQuotaException,
-} from "../exceptions";
-import { Video, VideoService } from "ott-common/models/video";
-import { getLogger } from "../logger";
+} from "../exceptions.js";
+import type { Video, VideoService } from "ott-common/models/video.js";
+import { getLogger } from "../logger.js";
 
 const log = getLogger("googledrive");
+const GOOGLE_DRIVE_FOLDER_PATH_REGEX = /^\/drive\/u\/\d\/folders\//;
+const GOOGLE_DRIVE_VIDEO_ID_REGEX = /^[A-Za-z0-9_-]+$/;
 
 interface GoogleDriveFile {
 	kind: "drive#file";
@@ -37,7 +39,7 @@ interface GoogleDriveErrorResponse {
 }
 
 function isGoogleDriveApiError(
-	response: AxiosResponse<any> | undefined
+	response: AxiosResponse<any> | undefined,
 ): response is AxiosResponse<GoogleDriveErrorResponse> {
 	return !!response && "error" in response.data;
 }
@@ -77,7 +79,7 @@ export default class GoogleDriveAdapter extends ServiceAdapter {
 	}
 
 	getFolderId(url: URL): string {
-		if (/^\/drive\/u\/\d\/folders\//.exec(url.pathname)) {
+		if (GOOGLE_DRIVE_FOLDER_PATH_REGEX.exec(url.pathname)) {
 			return url.pathname.split("/")[5].split("?")[0].trim();
 		} else if (url.pathname.startsWith("/drive/folders")) {
 			return url.pathname.split("/")[3].split("?")[0].trim();
@@ -95,7 +97,7 @@ export default class GoogleDriveAdapter extends ServiceAdapter {
 	}
 
 	async fetchVideoInfo(videoId: string): Promise<Video> {
-		if (!/^[A-Za-z0-9_-]+$/.exec(videoId)) {
+		if (!GOOGLE_DRIVE_VIDEO_ID_REGEX.exec(videoId)) {
 			throw new InvalidVideoIdException(this.serviceId, videoId);
 		}
 
@@ -114,7 +116,7 @@ export default class GoogleDriveAdapter extends ServiceAdapter {
 				log.error(
 					`Failed to get video metadata: ${
 						err.response.data.error.message
-					} ${JSON.stringify(err.response.data.error.errors)}`
+					} ${JSON.stringify(err.response.data.error.errors)}`,
 				);
 			} else if (err instanceof Error) {
 				log.error(`Failed to get video metadata: ${err.message} ${err.stack}`);
@@ -144,7 +146,7 @@ export default class GoogleDriveAdapter extends ServiceAdapter {
 					log.error(
 						`Failed to get google drive folder: ${
 							err.response.data.error.message
-						} ${JSON.stringify(err.response.data.error.errors)}`
+						} ${JSON.stringify(err.response.data.error.errors)}`,
 					);
 				}
 			} else if (err instanceof Error) {
@@ -168,6 +170,23 @@ export default class GoogleDriveAdapter extends ServiceAdapter {
 		}
 	}
 
+	videoLink(videoId: string): string {
+		// Yes, we send the google drive api key to the client. This is because we need to get the download link, but we can only do that
+		// by authenticating with google, either by api key or by having people sign in with google. This is easier, and not really a problem
+		// because we have 1,000,000,000 google drive api quota and the api methods we use don't cost that much. And this means we don't have
+		// to waste bandwidth streaming video to clients.
+		return `https://www.googleapis.com/drive/v3/files/${videoId}?key=${this.apiKey}&alt=media&aknowledgeAbuse=true`;
+	}
+
+	// Since src_url is not stored in the cache (and I don't think it is necessary to do so),
+	// we need to re-add it here
+	postProcessVideo(video: Video): Video {
+		return {
+			...video,
+			src_url: this.videoLink(video.id),
+		};
+	}
+
 	parseFile(file: GoogleDriveFile): Video {
 		return {
 			service: this.serviceId,
@@ -176,6 +195,7 @@ export default class GoogleDriveAdapter extends ServiceAdapter {
 			thumbnail: file.thumbnailLink,
 			length: Math.ceil(file.videoMediaMetadata.durationMillis / 1000),
 			mime: file.mimeType,
+			src_url: this.videoLink(file.id),
 		};
 	}
 }

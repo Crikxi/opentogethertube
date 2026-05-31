@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
-import VimeoAdapter from "../../../services/vimeo";
-import { InvalidVideoIdException } from "../../../exceptions";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import VimeoAdapter from "../../../services/vimeo.js";
+import { InvalidVideoIdException } from "../../../exceptions.js";
 
-const validVideoLinks = [["283918572", "https://vimeo.com/283918572"]];
+const validVideoLinks = [
+	["283918572", "https://vimeo.com/283918572"],
+	["283918572", "https://www.vimeo.com/283918572"],
+];
 
-const invalidLinks = ["https://example.com", "https://vimeo.com", "https://vimeo.com/lkjsads"];
+const invalidLinks = [
+	"https://example.com",
+	"https://vimeo.com",
+	"https://vimeo.com/lkjsads",
+	"https://evilvimeo.com/283918572",
+	"https://vimeo.com.evil.com/283918572",
+];
 
 describe("Vimeo", () => {
 	describe("canHandleURL", () => {

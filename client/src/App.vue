@@ -19,6 +19,9 @@
 			</v-app-bar-title>
 			<v-toolbar-items v-if="$vuetify.display.lgAndUp">
 				<v-btn variant="text" to="/rooms">{{ $t("nav.browse") }}</v-btn>
+				<v-btn v-if="store.state.user" variant="text" to="/my-rooms">
+					{{ $t("nav.my-rooms") }}
+				</v-btn>
 				<v-btn
 					variant="text"
 					href="https://github.com/dyc3/opentogethertube/discussions/830"
@@ -31,11 +34,11 @@
 					href="https://github.com/dyc3/opentogethertube/issues/new/choose"
 					target="_blank"
 				>
-					<v-icon class="side-pad">mdi-bug</v-icon>
+					<v-icon class="side-pad" :icon="mdiBug" />
 					{{ $t("nav.bug") }}
 				</v-btn>
 				<v-btn variant="text" href="https://github.com/sponsors/dyc3" target="_blank">
-					<v-icon class="side-pad">mdi-heart</v-icon>
+					<v-icon class="side-pad" :icon="mdiHeart" />
 					{{ $t("nav.support") }}
 				</v-btn>
 			</v-toolbar-items>
@@ -44,7 +47,7 @@
 				<v-menu offset-y>
 					<template v-slot:activator="{ props }">
 						<v-btn variant="text" v-bind="props">
-							<v-icon class="side-pad">mdi-plus-box</v-icon>
+							<v-icon class="side-pad" :icon="mdiPlusBox" />
 							{{ $t("nav.create.title") }}
 						</v-btn>
 					</template>
@@ -67,6 +70,9 @@
 				<v-list-item to="/rooms">
 					{{ $t("nav.browse") }}
 				</v-list-item>
+				<v-list-item v-if="store.state.user" to="/my-rooms">
+					{{ $t("nav.my-rooms") }}
+				</v-list-item>
 				<v-list-item
 					href="https://github.com/dyc3/opentogethertube/discussions/830"
 					target="_blank"
@@ -78,13 +84,13 @@
 					target="_blank"
 				>
 					<template #prepend>
-						<v-icon>mdi-bug</v-icon>
+						<v-icon :icon="mdiBug" />
 					</template>
 					{{ $t("nav.bug") }}
 				</v-list-item>
 				<v-list-item href="https://github.com/sponsors/dyc3" target="_blank">
 					<template #prepend>
-						<v-icon>mdi-heart</v-icon>
+						<v-icon :icon="mdiHeart" />
 					</template>
 					{{ $t("nav.support") }}
 				</v-list-item>
@@ -132,6 +138,7 @@
 </template>
 
 <script lang="ts">
+import { mdiBug, mdiHeart, mdiPlusBox } from "@mdi/js";
 import { defineComponent, onMounted, ref, computed } from "vue";
 import { API } from "@/common-http";
 import CreateRoomForm from "@/components/CreateRoomForm.vue";
@@ -146,7 +153,8 @@ import logoUrl from "@/assets/logo.svg";
 import { useStore } from "@/store";
 import LocaleSelector from "@/components/navbar/LocaleSelector.vue";
 
-export const App = defineComponent({
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
+const App = defineComponent({
 	name: "app",
 	components: {
 		CreateRoomForm,
@@ -234,17 +242,22 @@ export const App = defineComponent({
 			createTempRoom,
 			logoUrl,
 			store,
+			mdiBug,
+			mdiHeart,
+			mdiPlusBox,
 		};
 	},
 });
 
+// biome-ignore lint/nursery/noVueOptionsApi: TODO: convert to setup
 export default App;
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
-@import "variables.scss";
-@import "fonts.scss";
-@import "common.scss";
+@use "./variables.scss";
+@use "./fonts.scss";
+@use "./common.scss";
 
 .link {
 	text-decoration: underline;
@@ -276,6 +289,7 @@ export default App;
 .scrollbarBeGone {
 	-ms-overflow-style: none; // I think this is an old way to do this? Probably not ideal
 	scrollbar-width: none;
+
 	&::-webkit-scrollbar {
 		display: none;
 	}

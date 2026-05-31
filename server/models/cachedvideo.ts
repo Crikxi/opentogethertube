@@ -1,6 +1,6 @@
-import { ALL_VIDEO_SERVICES } from "ott-common/constants";
-import { VideoService } from "ott-common/models/video";
-import { Sequelize, Model, DataTypes, Optional } from "sequelize";
+import { ALL_VIDEO_SERVICES } from "ott-common/constants.js";
+import type { VideoService } from "ott-common/models/video.js";
+import { type Sequelize, Model, DataTypes } from "sequelize";
 
 interface CachedVideoAttributes {
 	id: number;
@@ -59,7 +59,7 @@ export const createModel = (sequelize: Sequelize) => {
 		{
 			sequelize,
 			modelName: "CachedVideo",
-		}
+		},
 	);
 
 	return CachedVideo;

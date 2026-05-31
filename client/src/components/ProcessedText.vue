@@ -20,7 +20,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, watch, Ref, toRefs } from "vue";
+import { ref, onMounted, watch, type Ref, toRefs } from "vue";
 
 const urlRegex = /(https?:\/\/[^\s]+)/;
 
@@ -36,7 +36,7 @@ const props = withDefaults(
 	}>(),
 	{
 		showAddQueueTooltip: true,
-	}
+	},
 );
 
 const emit = defineEmits<{
@@ -62,6 +62,7 @@ function processText() {
 	let match;
 	let index = 0;
 	let loop = 0;
+	// biome-ignore lint/suspicious/noAssignInExpressions: biome migration
 	while ((match = urlRegex.exec(text.value.substring(index))) !== null) {
 		// console.log("msg:", this.text, "match", match, "content", this.content);
 		if (match.index > index) {
@@ -90,10 +91,10 @@ watch(
 	() => text,
 	() => {
 		processText();
-	}
+	},
 );
 </script>
 
 <style lang="scss" scoped>
-@import "../variables.scss";
+@use "../variables.scss";
 </style>

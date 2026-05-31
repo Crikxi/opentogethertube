@@ -1,7 +1,7 @@
-import redis, { RedisClientOptions, RedisClientType } from "redis";
+import redis, { type RedisClientOptions, type RedisClientType } from "redis";
 import { Counter, Gauge } from "prom-client";
-import { conf } from "./ott-config";
-import { getLogger } from "./logger";
+import { conf } from "./ott-config.js";
+import { getLogger } from "./logger.js";
 const log = getLogger("redisclient");
 
 function buildOptions(): RedisClientOptions<redis.RedisDefaultModules> {
@@ -16,10 +16,10 @@ function buildOptions(): RedisClientOptions<redis.RedisDefaultModules> {
 					? {
 							tls: true,
 							rejectUnauthorized: !heroku,
-					  }
+						}
 					: {},
 				database: db,
-		  }
+			}
 		: {
 				socket: {
 					port: conf.get("redis.port") ?? undefined,
@@ -28,7 +28,7 @@ function buildOptions(): RedisClientOptions<redis.RedisDefaultModules> {
 				username: conf.get("redis.username") ?? undefined,
 				password: conf.get("redis.password") ?? undefined,
 				database: conf.get("redis.db") ?? undefined,
-		  };
+			};
 	return redisOptions;
 }
 
@@ -89,7 +89,7 @@ function parseRedisInfo(lines: string[]): Record<string, string> {
 }
 
 /** Map of the redis metric name to our prometheus counter. */
-let redisMetrics: Record<string, Counter | Gauge> = {};
+const redisMetrics: Record<string, Counter | Gauge> = {};
 
 export async function registerRedisMetrics(): Promise<void> {
 	if (Object.keys(redisMetrics).length > 0) {
@@ -219,8 +219,8 @@ async function collectRedisMetrics() {
 	let countMetricsSkipped = 0;
 	for (const [key, value] of Object.entries(mergedInfo)) {
 		if (key in redisMetrics) {
-			let metric = redisMetrics[key];
-			let parsed = Number(value);
+			const metric = redisMetrics[key];
+			const parsed = Number(value);
 			if (metric instanceof Counter) {
 				metric.reset();
 				metric.inc(parsed);
@@ -237,6 +237,7 @@ async function collectRedisMetrics() {
 	log.silly(`Collected ${countMetricsCollected} redis metrics, skipped ${countMetricsSkipped}`);
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const gaugeRedisDbsize = new Gauge({
 	name: "redis_keys_count",
 	help: "The number of keys in the database",

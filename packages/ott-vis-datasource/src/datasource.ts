@@ -1,18 +1,20 @@
 import {
-	DataQueryRequest,
-	DataQueryResponse,
+	type DataQueryRequest,
+	type DataQueryResponse,
 	DataSourceApi,
-	DataSourceInstanceSettings,
+	type DataSourceInstanceSettings,
 	MutableDataFrame,
 	FieldType,
 	CircularDataFrame,
 	LoadingState,
 } from "@grafana/data";
 
-import { MyQuery, MyDataSourceOptions } from "./types";
+import type { MyQuery, MyDataSourceOptions } from "./types";
 import { getBackendSrv } from "@grafana/runtime";
 import type { SystemState } from "ott-vis";
 import { Observable, lastValueFrom, merge } from "rxjs";
+
+const HTTP_PROTOCOL_REGEX = /^http/;
 
 export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
 	baseUrl: string;
@@ -40,7 +42,7 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
 					frame.addField({ name: "direction", type: FieldType.string });
 					frame.addField({ name: "room", type: FieldType.string });
 
-					const base = this.baseUrl.replace(/^http/, "ws");
+					const base = this.baseUrl.replace(HTTP_PROTOCOL_REGEX, "ws");
 
 					const open = (e: Event) => {
 						console.log("WebSocket opened", e);

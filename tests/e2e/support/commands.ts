@@ -69,17 +69,41 @@ Cypress.Commands.add("ottLogin", userCreds => {
 	});
 });
 
-Cypress.Commands.add("ottSliderMove", { prevSubject: 'element' }, (subject, percent) => {
+Cypress.Commands.add("ottCreateSocialUser", user => {
+	return cy.ottRequest({
+		method: "POST",
+		url: "/api/dev/user/create-social",
+		body: user,
+	});
+});
+
+Cypress.Commands.add("ottForceLogin", username => {
+	return cy.ottRequest({
+		method: "POST",
+		url: "/api/dev/user/force-login",
+		body: { username },
+	});
+});
+
+Cypress.Commands.add("ottSetDiscordLink", user => {
+	return cy.ottRequest({
+		method: "POST",
+		url: "/api/dev/user/set-discord-link",
+		body: user,
+	});
+});
+
+Cypress.Commands.add("ottSliderMove", { prevSubject: "element" }, (subject, percent) => {
 	const slider = subject[0];
 	const rect = slider.getBoundingClientRect();
 	const x = rect.width * percent;
 	const y = rect.height / 2;
 	cy.log(`Moving slider to ${percent * 100}% at x: ${x} y: ${y}`);
 	return cy.wrap(slider).click(x, y);
-})
+});
 
 Cypress.Commands.add("ottCloseToasts", () => {
 	cy.get('[data-cy="toast-close-all"]').click();
-})
+});
 
 export {};

@@ -1,32 +1,33 @@
-import { URL } from "url";
+import { URL } from "node:url";
 import _ from "lodash";
-import GoogleDriveAdapter from "./services/googledrive";
-import VimeoAdapter from "./services/vimeo";
-import YouTubeAdapter from "./services/youtube";
-import DirectVideoAdapter from "./services/direct";
-import RedditAdapter from "./services/reddit";
-import HlsVideoAdapter from "./services/hls";
-import storage from "./storage";
+import GoogleDriveAdapter from "./services/googledrive.js";
+import VimeoAdapter from "./services/vimeo.js";
+import YouTubeAdapter from "./services/youtube.js";
+import DirectVideoAdapter from "./services/direct.js";
+import RedditAdapter from "./services/reddit.js";
+import HlsVideoAdapter from "./services/hls.js";
+import storage from "./storage.js";
 import {
 	UnsupportedMimeTypeException,
 	OutOfQuotaException,
 	UnsupportedServiceException,
 	InvalidAddPreviewInputException,
 	FeatureDisabledException,
-} from "./exceptions";
-import { getLogger } from "./logger";
-import { redisClient } from "./redisclient";
-import { isSupportedMimeType } from "./mime";
-import { Video, VideoId, VideoMetadata, VideoService } from "ott-common/models/video";
-import { ServiceAdapter } from "./serviceadapter";
-import { OttException } from "ott-common/exceptions";
-import TubiAdapter from "./services/tubi";
+} from "./exceptions.js";
+import { getLogger } from "./logger.js";
+import { redisClient } from "./redisclient.js";
+import { isSupportedMimeType } from "./mime.js";
+import type { Video, VideoId, VideoMetadata, VideoService } from "ott-common/models/video.js";
+import type { ServiceAdapter } from "./serviceadapter.js";
+import { OttException } from "ott-common/exceptions.js";
+import TubiAdapter from "./services/tubi.js";
 import { Counter } from "prom-client";
-import { conf } from "./ott-config";
-import PeertubeAdapter from "./services/peertube";
-import PlutoAdapter from "./services/pluto";
-import DashVideoAdapter from "./services/dash";
-import { Ls } from "dayjs";
+import { conf } from "./ott-config.js";
+import PeertubeAdapter from "./services/peertube.js";
+import PlutoAdapter from "./services/pluto.js";
+import DashVideoAdapter from "./services/dash.js";
+import InvidiousAdapter from "./services/invidious.js";
+import OdyseeAdapter from "./services/odysee.js";
 
 const log = getLogger("infoextract");
 
@@ -36,7 +37,7 @@ const ENABLE_SEARCH = conf.get("add_preview.search.enabled");
 function mergeVideo(a: Video, b: Video): Video {
 	return Object.assign(
 		a,
-		_.pickBy(b, x => !!x)
+		_.pickBy(b, x => !!x),
 	);
 }
 
@@ -86,6 +87,12 @@ export async function initExtractor() {
 	if (enabled.includes("pluto")) {
 		adapters.push(new PlutoAdapter());
 	}
+	if (enabled.includes("invidious")) {
+		adapters.push(new InvidiousAdapter());
+	}
+	if (enabled.includes("odysee")) {
+		adapters.push(new OdyseeAdapter());
+	}
 
 	await Promise.all(adapters.map(adapter => adapter.initialize()));
 }
@@ -106,7 +113,7 @@ export default {
 	 */
 	async getCachedVideo(
 		service: VideoService,
-		videoId: string
+		videoId: string,
 	): Promise<[Video, (keyof VideoMetadata)[]]> {
 		try {
 			const result = await storage.getVideoInfo(service, videoId);
@@ -154,7 +161,7 @@ export default {
 		await redisClient.setEx(
 			`search:${service}:${query}`,
 			60 * 60 * 24,
-			JSON.stringify(results)
+			JSON.stringify(results),
 		);
 	},
 
@@ -191,12 +198,12 @@ export default {
 		const [cachedVideo, missingInfo] = await this.getCachedVideo(service, videoId);
 
 		if (missingInfo.length === 0) {
-			return cachedVideo;
+			return adapter.postProcessVideo(cachedVideo);
 		} else {
 			log.warn(
 				`MISSING INFO for ${cachedVideo.service}:${
 					cachedVideo.id
-				}: ${missingInfo.toString()}`
+				}: ${missingInfo.toString()}`,
 			);
 
 			try {
@@ -223,7 +230,7 @@ export default {
 						missingInfo.length < storage.getVideoInfoFields(cachedVideo.service).length
 					) {
 						log.warn(
-							`Returning incomplete cached result for ${cachedVideo.service}:${cachedVideo.id}`
+							`Returning incomplete cached result for ${cachedVideo.service}:${cachedVideo.id}`,
 						);
 						return cachedVideo;
 					} else {
@@ -232,11 +239,11 @@ export default {
 				} else {
 					if (e instanceof Error) {
 						log.error(
-							`Failed to get video info for ${cachedVideo.service}:${cachedVideo.id}: ${e.message} ${e.stack}`
+							`Failed to get video info for ${cachedVideo.service}:${cachedVideo.id}: ${e.message} ${e.stack}`,
 						);
 					} else {
 						log.error(
-							`Failed to get video info for ${cachedVideo.service}:${cachedVideo.id}`
+							`Failed to get video info for ${cachedVideo.service}:${cachedVideo.id}`,
 						);
 					}
 					throw e;
@@ -279,7 +286,7 @@ export default {
 					}
 				});
 				return finalResults;
-			})
+			}),
 		);
 
 		const flattened = results.flat();
@@ -291,7 +298,7 @@ export default {
 			result.filter(video => {
 				const adapter = this.getServiceAdapter(video.service);
 				return adapter.isCacheSafe;
-			})
+			}),
 		);
 		return result;
 	},
@@ -301,12 +308,19 @@ export default {
 	 * video or a video collection, or search terms to run against an API. If query is a URL, a service
 	 * adapter will automatically be selected to handle it. If it is not a URL, searchService will be
 	 * used to perform a search.
+	 * @param query The query string (URL or search terms)
+	 * @param searchService The service to use for search queries
+	 * @param forceAdapter Optional service ID to force a specific adapter to handle the URL
 	 */
-	async resolveVideoQuery(query: string, searchService: string): Promise<AddPreview> {
+	async resolveVideoQuery(
+		query: string,
+		searchService: string,
+		forceAdapter?: string,
+	): Promise<AddPreview> {
 		counterAddPreviewsRequested.inc();
 		counterMethodsInvoked.labels({ method: "resolveVideoQuery" }).inc();
 		try {
-			let result = await this.resolveVideoQueryImpl(query, searchService);
+			const result = await this.resolveVideoQueryImpl(query, searchService, forceAdapter);
 			counterAddPreviewsCompleted.labels({ result: "success" }).inc();
 			return result;
 		} catch (e: unknown) {
@@ -317,7 +331,11 @@ export default {
 		}
 	},
 
-	async resolveVideoQueryImpl(query: string, searchService: string): Promise<AddPreview> {
+	async resolveVideoQueryImpl(
+		query: string,
+		searchService: string,
+		forceAdapter?: string,
+	): Promise<AddPreview> {
 		let results: Video[] = [];
 		let cacheDuration = 60 * 60;
 
@@ -328,7 +346,9 @@ export default {
 				.filter(line => this.isURL(line));
 
 			const videoIds = lines.map(line => {
-				const adapter = this.getServiceAdapterForURL(line);
+				const adapter = forceAdapter
+					? this.getServiceAdapter(forceAdapter)
+					: this.getServiceAdapterForURL(line);
 				return {
 					service: adapter.serviceId,
 					id: adapter.getVideoId(line),
@@ -337,7 +357,9 @@ export default {
 
 			results = await this.getManyVideoInfo(videoIds);
 		} else if (this.isURL(query)) {
-			const adapter = this.getServiceAdapterForURL(query);
+			const adapter = forceAdapter
+				? this.getServiceAdapter(forceAdapter)
+				: this.getServiceAdapterForURL(query);
 
 			if (!adapter) {
 				throw new UnsupportedServiceException(query);
@@ -357,7 +379,7 @@ export default {
 			const fetchResults = await adapter.resolveURL(query);
 			const resolvedResults: VideoId[] = [];
 			if (Array.isArray(fetchResults)) {
-				for (let video of fetchResults) {
+				for (const video of fetchResults) {
 					if ("url" in video) {
 						try {
 							const adapter = this.getServiceAdapterForURL(video.url);
@@ -373,7 +395,6 @@ export default {
 							});
 						} catch (e) {
 							log.warn(`Failed to resolve video URL ${video.url}: ${e.message}`);
-							continue;
 						}
 					} else {
 						resolvedResults.push(video);
@@ -388,8 +409,8 @@ export default {
 					highlighted: fetchResults.highlighted
 						? await this.getVideoInfo(
 								fetchResults.highlighted.service,
-								fetchResults.highlighted.id
-						  )
+								fetchResults.highlighted.id,
+							)
 						: undefined,
 				};
 				return new AddPreview(completeResults, cacheDuration);

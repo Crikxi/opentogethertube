@@ -1,10 +1,10 @@
 /* eslint-disable camelcase */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import RedditAdapter, {
-	RedditListableThing,
-	RedditListing,
-	RedditPost,
-} from "../../../../server/services/reddit";
+	type RedditListableThing,
+	type RedditListing,
+	type RedditPost,
+} from "../../../../server/services/reddit.js";
 
 const subredditListResponse: RedditListing<RedditListableThing> = {
 	kind: "Listing",

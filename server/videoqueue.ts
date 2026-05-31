@@ -1,9 +1,9 @@
 import { Mutex } from "@divine/synchronization";
 
-import { Dirtyable } from "./util";
-import { QueueItem, Video, VideoId } from "ott-common/models/video";
+import { Dirtyable } from "./util/index.js";
+import type { QueueItem, QueueItemExtras, Video, VideoId } from "ott-common/models/video.js";
 import _ from "lodash";
-import { VideoNotFoundException } from "./exceptions";
+import { VideoNotFoundException } from "./exceptions.js";
 
 /** A concurrently safe orderable queue for videos. */
 export class VideoQueue extends Dirtyable {
@@ -56,7 +56,7 @@ export class VideoQueue extends Dirtyable {
 	/** Dequeue the next video in the queue. */
 	async dequeue(): Promise<QueueItem | undefined> {
 		return this.lock.protect(() => {
-			let item = this._items.shift();
+			const item = this._items.shift();
 			this.markDirty();
 			return item;
 		});
@@ -116,7 +116,7 @@ export class VideoQueue extends Dirtyable {
 	findIndex(video: VideoId): number {
 		const matchIdx = _.findIndex(
 			this._items,
-			item => item.service === video.service && item.id === video.id
+			item => item.service === video.service && item.id === video.id,
 		);
 		return matchIdx;
 	}
@@ -140,10 +140,22 @@ export class VideoQueue extends Dirtyable {
 		});
 	}
 
+	/** Update queue item extras (e.g. subtitleUrl) for a video already in the queue. */
+	async update(video: VideoId, patch: Partial<QueueItemExtras>): Promise<void> {
+		return this.lock.protect(() => {
+			const matchIdx = this.findIndex(video);
+			if (matchIdx < 0) {
+				throw new VideoNotFoundException();
+			}
+			Object.assign(this._items[matchIdx], patch);
+			this.markDirty();
+		});
+	}
+
 	/** Reorder the queue based on the given criteria. Takes the same arguments as lodash `_.orderBy()`. */
 	async orderBy(
 		iteratees: _.Many<_.ListIterator<QueueItem, _.NotVoid>>,
-		orders: string | boolean | readonly (boolean | "asc" | "desc")[] | string[]
+		orders: string | boolean | readonly (boolean | "asc" | "desc")[] | string[],
 	) {
 		await this.lock.protect(() => {
 			const _oldOrder = _.clone(this._items);

@@ -1,5 +1,5 @@
 describe("Room events", () => {
-	Cypress.on("uncaught:exception", (err, runnable) => {
+	Cypress.on("uncaught:exception", (_err, _runnable) => {
 		return false;
 	});
 
@@ -22,5 +22,5 @@ describe("Room events", () => {
 		cy.wait(200);
 		cy.get('[aria-label="Next video"]').click();
 		cy.get(".toast-item").contains("skipped oceans");
-	})
-})
+	});
+});

@@ -1,8 +1,8 @@
-import permissions, { GrantMask, Grants } from "ott-common/permissions";
-import { redisClient } from "./redisclient";
-import { getLogger } from "./logger";
-import winston from "winston";
-import {
+import permissions, { type GrantMask, Grants } from "ott-common/permissions.js";
+import { redisClient } from "./redisclient.js";
+import { getLogger } from "./logger.js";
+import type winston from "winston";
+import type {
 	AddRequest,
 	ApplySettingsRequest,
 	ChatRequest,
@@ -14,7 +14,6 @@ import {
 	RemoveRequest,
 	RoomRequest,
 	RoomRequestBase,
-	RoomRequestType,
 	SeekRequest,
 	ServerMessage,
 	ServerMessageSync,
@@ -28,50 +27,57 @@ import {
 	ShuffleRequest,
 	PlaybackSpeedRequest,
 	KickRequest,
-} from "ott-common/models/messages";
+	UpdateQueueItemRequest,
+} from "ott-common/models/messages.js";
+import { RoomRequestType } from "ott-common/models/messages.js";
 import _ from "lodash";
-import InfoExtract from "./infoextractor";
-import usermanager from "./usermanager";
+import InfoExtract from "./infoextractor.js";
+import usermanager from "./usermanager.js";
 import {
-	ClientInfo,
+	type ClientInfo,
 	QueueMode,
 	Visibility,
-	RoomOptions,
-	RoomUserInfo,
+	type RoomOptions,
+	type RoomUserInfo,
 	Role,
-	ClientId,
+	type ClientId,
 	PlayerStatus,
-	RoomEventContext,
-	RoomSettings,
-	AuthToken,
+	type RoomEventContext,
+	type RoomSettings,
+	type AuthToken,
 	BehaviorOption,
-} from "ott-common/models/types";
-import { User } from "./models/user";
-import type { QueueItem, Video, VideoId } from "ott-common/models/video";
-import dayjs, { Dayjs } from "dayjs";
-import type { PickFunctions } from "ott-common/typeutils";
-import { replacer } from "ott-common/serialize";
+} from "ott-common/models/types.js";
+import type { User } from "./models/user.js";
+import type { QueueItem, Video, VideoId } from "ott-common/models/video.js";
+import dayjs, { type Dayjs } from "dayjs";
+import type { PickFunctions } from "ott-common/typeutils.js";
+import { replacer } from "ott-common/serialize.js";
 import {
 	ClientNotFoundInRoomException,
 	ImpossiblePromotionException,
 	VideoAlreadyQueuedException,
 	VideoNotFoundException,
-} from "./exceptions";
-import storage from "./storage";
-import tokens, { SessionInfo } from "./auth/tokens";
-import { OttException } from "ott-common/exceptions";
-import { fetchSegments, getSponsorBlock } from "./sponsorblock";
-import { ResponseError as SponsorblockResponseError, Segment, Category } from "sponsorblock-api";
-import { VideoQueue } from "./videoqueue";
+	UnsupportedSubtitleType,
+} from "./exceptions.js";
+import storage from "./storage.js";
+import tokens, { type SessionInfo } from "./auth/tokens.js";
+import { OttException } from "ott-common/exceptions.js";
+import { fetchSegments } from "./sponsorblock.js";
+import {
+	ResponseError as SponsorblockResponseError,
+	type Segment,
+	type Category,
+} from "sponsorblock-api";
+import { VideoQueue } from "./videoqueue.js";
 import { Counter } from "prom-client";
-import roommanager from "./roommanager";
-import { calculateCurrentPosition } from "ott-common/timestamp";
-import { RestoreQueueRequest } from "ott-common/models/messages";
-import { Result, countEligibleVoters, err, ok, voteSkipThreshold } from "ott-common";
-import type { ClientManagerCommand } from "./clientmanager";
-import { canKickUser } from "ott-common/userutils";
-import { conf } from "./ott-config";
-import { ALL_SKIP_CATEGORIES } from "ott-common/constants";
+import roommanager from "./roommanager.js";
+import { calculateCurrentPosition } from "ott-common/timestamp.js";
+import type { RestoreQueueRequest } from "ott-common/models/messages.js";
+import { type Result, countEligibleVoters, err, ok, voteSkipThreshold } from "ott-common";
+import type { ClientManagerCommand } from "./clientmanager.js";
+import { canKickUser } from "ott-common/userutils.js";
+import { conf } from "./ott-config.js";
+import { ALL_SKIP_CATEGORIES } from "ott-common/constants.js";
 
 /**
  * Represents a User from the Room's perspective.
@@ -285,8 +291,8 @@ export class Room implements RoomState {
 				"prevQueue",
 				"restoreQueueBehavior",
 				"enableVoteSkip",
-				"votesToSkip"
-			)
+				"votesToSkip",
+			),
 		);
 		if (this.restoreQueueBehavior === BehaviorOption.Never) {
 			this.prevQueue = null;
@@ -331,10 +337,10 @@ export class Room implements RoomState {
 			}
 		}
 		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-		// @ts-ignore
+		// @ts-expect-error
 		if (options._playbackStart) {
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-			// @ts-ignore
+			// @ts-expect-error
 			this._playbackStart = dayjs(options._playbackStart);
 		}
 		if (Array.isArray(this.votesToSkip)) {
@@ -500,6 +506,11 @@ export class Room implements RoomState {
 		this.queue.clean();
 	}
 
+	private clearQueueItemTrim(queueItem: QueueItem): QueueItem {
+		const { startAt: _startAt, endAt: _endAt, ...queueItemWithoutTrim } = queueItem;
+		return queueItemWithoutTrim;
+	}
+
 	async dequeueNext() {
 		this.log.debug(`dequeuing next video. mode: ${this.queueMode}`);
 		if (this.enableVoteSkip) {
@@ -513,12 +524,13 @@ export class Room implements RoomState {
 				.inc(this.calcDurationFromPlaybackStart());
 			if (this.queueMode === QueueMode.Dj) {
 				this.log.debug(`queue in dj mode, restarting current item`);
-				this.playbackPosition = this.currentSource?.startAt ?? 0;
+				this.currentSource = this.clearQueueItemTrim(this.currentSource);
+				this.playbackPosition = 0;
 				this._playbackStart = dayjs();
 				return;
 			} else if (this.queueMode === QueueMode.Loop) {
 				this.log.debug(`queue in loop mode, requeuing current item`);
-				await this.queue.enqueue(this.currentSource);
+				await this.queue.enqueue(this.clearQueueItemTrim(this.currentSource));
 			}
 		}
 		if (this.queue.length > 0) {
@@ -573,7 +585,7 @@ export class Room implements RoomState {
 	async publishRoomEvent(
 		request: RoomRequest,
 		context: RoomRequestContext,
-		additional?: RoomEventContext
+		additional?: RoomEventContext,
 	): Promise<void> {
 		if (context.clientId === undefined) {
 			this.log.warn("context.clientId was undefined, not publishing event");
@@ -664,7 +676,7 @@ export class Room implements RoomState {
 	}
 
 	async getUserInfoFromToken(
-		token: AuthToken
+		token: AuthToken,
 	): Promise<Pick<RoomUserInfo, "name" | "isLoggedIn">> {
 		if (!token) {
 			throw new Error("token is a required parameter.");
@@ -762,7 +774,7 @@ export class Room implements RoomState {
 						return votes ? votes.size : 0;
 					},
 				],
-				["desc"]
+				["desc"],
 			);
 		}
 
@@ -779,7 +791,7 @@ export class Room implements RoomState {
 							this.log.debug("No sponsorblock segments available for this video.");
 						} else {
 							this.log.error(
-								`Failed to grab sponsorblock segments: ${e.name} ${e.status} ${e.message}`
+								`Failed to grab sponsorblock segments: ${e.name} ${e.status} ${e.message}`,
 							);
 						}
 					} else {
@@ -858,7 +870,7 @@ export class Room implements RoomState {
 
 		const state: RoomStateSyncable = this.syncableState();
 		const isAnyDirtyStorable = Array.from(this._dirty).some(prop =>
-			storableProps.includes(prop as any)
+			storableProps.includes(prop as any),
 		);
 
 		msg = Object.assign(msg, _.pick(state, Array.from(this._dirty)));
@@ -870,7 +882,7 @@ export class Room implements RoomState {
 			await this.publish(msg);
 		}
 
-		let settings: Partial<RoomStatePersistable> = _.pick(
+		const settings: Partial<RoomStatePersistable> = _.pick(
 			this,
 			"name",
 			"title",
@@ -881,7 +893,7 @@ export class Room implements RoomState {
 			"grants",
 			"userRoles",
 			"owner",
-			"prevQueue"
+			"prevQueue",
 		);
 		if (!_.isEmpty(settings)) {
 			await storage.updateRoom({
@@ -952,7 +964,7 @@ export class Room implements RoomState {
 			return;
 		}
 		this.log.info(
-			`fetching sponsorblock segments for ${this.currentSource.service}:${this.currentSource.id}`
+			`fetching sponsorblock segments for ${this.currentSource.service}:${this.currentSource.id}`,
 		);
 		this.videoSegments = await fetchSegments(this.currentSource.id);
 	}
@@ -975,7 +987,7 @@ export class Room implements RoomState {
 	}
 
 	public async deriveRequestContext(
-		authorization: RoomRequestAuthorization
+		authorization: RoomRequestAuthorization,
 	): Promise<RoomRequestContext> {
 		if (authorization.clientId) {
 			const user = this.getUser(authorization.clientId);
@@ -991,7 +1003,7 @@ export class Room implements RoomState {
 
 		// the user is not in the room, but they may have a valid session
 
-		let session = await tokens.getSessionInfo(authorization.token);
+		const session = await tokens.getSessionInfo(authorization.token);
 		if (!session) {
 			throw new Error("Invalid token, unauthorized request");
 		}
@@ -1014,7 +1026,7 @@ export class Room implements RoomState {
 
 	public async processUnauthorizedRequest(
 		request: RoomRequest,
-		authorization: RoomRequestAuthorization
+		authorization: RoomRequestAuthorization,
 	): Promise<void> {
 		if (!authorization.clientId) {
 			const id = this.getClientIdFromToken(authorization.token);
@@ -1027,7 +1039,7 @@ export class Room implements RoomState {
 
 	/** Process the room request, but unsafely trust the client id of the room request */
 	public async processRequestUnsafe(request: RoomRequest, clientid: ClientId): Promise<void> {
-		let userInfo = this.getUserInfo(clientid);
+		const userInfo = this.getUserInfo(clientid);
 		await this.processRequest(request, {
 			username: userInfo.name,
 			role: userInfo.role,
@@ -1042,6 +1054,7 @@ export class Room implements RoomState {
 			[RoomRequestType.SkipRequest, "playback.skip"],
 			[RoomRequestType.SeekRequest, "playback.seek"],
 			[RoomRequestType.AddRequest, "manage-queue.add"],
+			[RoomRequestType.UpdateQueueItemRequest, "manage-queue.edit"],
 			[RoomRequestType.RemoveRequest, "manage-queue.remove"],
 			[RoomRequestType.OrderRequest, "manage-queue.order"],
 			[RoomRequestType.VoteRequest, "manage-queue.vote"],
@@ -1057,7 +1070,7 @@ export class Room implements RoomState {
 		}
 
 		this.log.debug(
-			`processing request: ${request.type} for ${context.username} (client: ${context.clientId})`
+			`processing request: ${request.type} for ${context.username} (client: ${context.clientId})`,
 		);
 
 		type RoomRequestHandlers = Omit<
@@ -1071,6 +1084,7 @@ export class Room implements RoomState {
 			[RoomRequestType.SkipRequest]: "skip",
 			[RoomRequestType.SeekRequest]: "seek",
 			[RoomRequestType.AddRequest]: "addToQueue",
+			[RoomRequestType.UpdateQueueItemRequest]: "updateQueueItem",
 			[RoomRequestType.RemoveRequest]: "removeFromQueue",
 			[RoomRequestType.OrderRequest]: "reorderQueue",
 			[RoomRequestType.VoteRequest]: "vote",
@@ -1161,7 +1175,7 @@ export class Room implements RoomState {
 
 			const eligibleUsers = countEligibleVoters(
 				this.realusers.map(u => this.getUserInfo(u.id)),
-				this.grants
+				this.grants,
 			);
 			if (this.votesToSkip.size >= voteSkipThreshold(eligibleUsers)) {
 				this.log.debug("vote threshold met, skipping video");
@@ -1231,11 +1245,18 @@ export class Room implements RoomState {
 
 			const video: Video = await InfoExtract.getVideoInfo(
 				request.video.service,
-				request.video.id
+				request.video.id,
 			);
 			if (video === undefined) {
 				this.log.error("video was undefined, which is bad");
 				throw new Error("video was undefined");
+			}
+			if (request.video.subtitleUrl) {
+				if (request.video.subtitleUrl.split(".").pop() !== "vtt") {
+					this.log.error("subtitle URL does not end with .vtt");
+					throw new UnsupportedSubtitleType();
+				}
+				video.subtitleUrl = request.video.subtitleUrl;
 			}
 			this.queue.enqueue(video);
 			this.log.info(`Video added: ${JSON.stringify(request.video)}`);
@@ -1253,7 +1274,6 @@ export class Room implements RoomState {
 				}
 				if (this.isVideoInQueue(video)) {
 					videos.splice(i--, 1);
-					continue;
 				}
 			}
 			if (videos.length === 0) {
@@ -1263,7 +1283,7 @@ export class Room implements RoomState {
 			this.queue.enqueue(...videos);
 			this.log.info(`added ${videos.length} videos`);
 			await this.publishRoomEvent(request, context, { videos });
-			for (let vid of videos) {
+			for (const vid of videos) {
 				counterMediaQueued.labels({ service: vid.service }).inc();
 			}
 		} else {
@@ -1272,9 +1292,24 @@ export class Room implements RoomState {
 		}
 	}
 
+	public async updateQueueItem(
+		request: UpdateQueueItemRequest,
+		context: RoomRequestContext,
+	): Promise<void> {
+		if (
+			request.update.subtitleUrl !== undefined &&
+			!request.update.subtitleUrl.endsWith(".vtt")
+		) {
+			throw new UnsupportedSubtitleType();
+		}
+		await this.queue.update(request.video, request.update);
+		this.log.info(`Queue item updated: ${JSON.stringify(request.video)}`);
+		await this.publishRoomEvent(request, context);
+	}
+
 	public async removeFromQueue(
 		request: RemoveRequest,
-		context: RoomRequestContext
+		context: RoomRequestContext,
 	): Promise<void> {
 		if (!this.queue.contains(request.video)) {
 			throw new VideoNotFoundException();
@@ -1367,7 +1402,7 @@ export class Room implements RoomState {
 							type: request.event.request.type,
 							value: request.event.additional.prevPosition,
 						},
-						context
+						context,
 					);
 				}
 				break;
@@ -1398,7 +1433,7 @@ export class Room implements RoomState {
 				) {
 					this.queue.insert(
 						request.event.additional.video,
-						request.event.additional.queueIdx
+						request.event.additional.queueIdx,
 					);
 				}
 				break;
@@ -1438,7 +1473,7 @@ export class Room implements RoomState {
 			throw new OttException("Client not found.");
 		}
 		this.log.info(
-			`${context.username} is attempting to promote ${targetUser.username} to role ${request.role}`
+			`${context.username} is attempting to promote ${targetUser.username} to role ${request.role}`,
 		);
 
 		let perm: string | undefined;
@@ -1505,7 +1540,7 @@ export class Room implements RoomState {
 				} else {
 					// eslint-disable-next-line @typescript-eslint/restrict-template-expressions
 					this.log.error(
-						`Failed to update room, and the error thrown was not Error: ${err}`
+						`Failed to update room, and the error thrown was not Error: ${err}`,
 					);
 				}
 			}
@@ -1514,7 +1549,7 @@ export class Room implements RoomState {
 
 	public async applySettings(
 		request: ApplySettingsRequest,
-		context: RoomRequestContext
+		context: RoomRequestContext,
 	): Promise<void> {
 		const propsToPerms: Record<keyof Omit<RoomSettings, "grants">, string> = {
 			title: "configure-room.set-title",
@@ -1535,7 +1570,7 @@ export class Room implements RoomState {
 		// TODO: have clients only send properties that they actually intend to change.
 		// For now, we'll determine what the request is trying to change here, and delete the identical fields from the request.
 		for (const prop in request.settings) {
-			if (Object.prototype.hasOwnProperty.call(propsToPerms, prop)) {
+			if (Object.hasOwn(propsToPerms, prop)) {
 				if (this[prop] === request.settings[prop]) {
 					this.log.silly(`deleting ${prop} from request because it did not change`);
 					delete request.settings[prop];
@@ -1544,16 +1579,16 @@ export class Room implements RoomState {
 		}
 		if (request.settings.grants) {
 			for (const role of request.settings.grants.getRoles()) {
-				if (Object.hasOwnProperty.call(roleToPerms, role)) {
+				if (Object.hasOwn(roleToPerms, role)) {
 					if (request.settings.grants.getMask(role) === this.grants.getMask(role)) {
 						this.log.silly(
-							`deleting permissions for role ${role} from request because it did not change`
+							`deleting permissions for role ${role} from request because it did not change`,
 						);
 						request.settings.grants.deleteRole(role);
 					}
 				} else {
 					this.log.silly(
-						`deleting permissions for role ${role} from request because that role's permissions can't change`
+						`deleting permissions for role ${role} from request because that role's permissions can't change`,
 					);
 					request.settings.grants.deleteRole(role);
 				}
@@ -1566,7 +1601,7 @@ export class Room implements RoomState {
 
 		// check permissions
 		for (const prop in request.settings) {
-			if (Object.prototype.hasOwnProperty.call(propsToPerms, prop)) {
+			if (Object.hasOwn(propsToPerms, prop)) {
 				this.grants.check(context.role, propsToPerms[prop]);
 			}
 		}
@@ -1574,7 +1609,7 @@ export class Room implements RoomState {
 		if (request.settings.grants) {
 			const newGrants = request.settings.grants;
 			for (const role of newGrants.getRoles()) {
-				if (Object.hasOwnProperty.call(roleToPerms, role)) {
+				if (Object.hasOwn(roleToPerms, role)) {
 					this.grants.check(context.role, roleToPerms[role]);
 				}
 			}
@@ -1583,13 +1618,13 @@ export class Room implements RoomState {
 		let autoSkipSegmentCategoriesChanged = false;
 		if (request.settings.autoSkipSegmentCategories) {
 			const autoSkipSegmentCategoriesSet = new Set(
-				request.settings.autoSkipSegmentCategories
+				request.settings.autoSkipSegmentCategories,
 			);
 			if (
 				!_.isEqual(autoSkipSegmentCategoriesSet, new Set(this._autoSkipSegmentCategories))
 			) {
 				request.settings.autoSkipSegmentCategories = ALL_SKIP_CATEGORIES.filter(category =>
-					autoSkipSegmentCategoriesSet.has(category)
+					autoSkipSegmentCategoriesSet.has(category),
 				);
 				autoSkipSegmentCategoriesChanged = true;
 			}
@@ -1599,7 +1634,7 @@ export class Room implements RoomState {
 
 		// apply the simple ones
 		for (const prop in request.settings) {
-			if (Object.prototype.hasOwnProperty.call(propsToPerms, prop)) {
+			if (Object.hasOwn(propsToPerms, prop)) {
 				this[prop] = request.settings[prop];
 			}
 		}
@@ -1607,7 +1642,7 @@ export class Room implements RoomState {
 		// special handling required for permissions
 		if (request.settings.grants) {
 			for (const role of request.settings.grants.getRoles()) {
-				if (Object.hasOwnProperty.call(roleToPerms, role)) {
+				if (Object.hasOwn(roleToPerms, role)) {
 					this.grants.setRoleGrants(role, request.settings.grants.getMask(role));
 					this.markDirty("grants");
 				}
@@ -1653,6 +1688,13 @@ export class Room implements RoomState {
 		} else {
 			videoToPlay = await InfoExtract.getVideoInfo(request.video.service, request.video.id);
 		}
+		if (request.video.subtitleUrl) {
+			if (request.video.subtitleUrl.split(".").pop() !== "vtt") {
+				this.log.error("subtitle URL does not end with .vtt");
+				throw new UnsupportedSubtitleType();
+			}
+			videoToPlay.subtitleUrl = request.video.subtitleUrl;
+		}
 		if (this.currentSource) {
 			this.currentSource.startAt = this.realPlaybackPosition;
 			await this.queue.pushTop(this.currentSource);
@@ -1674,7 +1716,7 @@ export class Room implements RoomState {
 
 	public async setPlaybackSpeed(
 		request: PlaybackSpeedRequest,
-		context: RoomRequestContext
+		context: RoomRequestContext,
 	): Promise<void> {
 		this.flushPlaybackPosition();
 		this.playbackSpeed = request.speed;
@@ -1682,7 +1724,7 @@ export class Room implements RoomState {
 
 	public async restoreQueue(
 		request: RestoreQueueRequest,
-		_context: RoomRequestContext
+		_context: RoomRequestContext,
 	): Promise<void> {
 		if (this.prevQueue === null) {
 			throw new Error("No previous queue to restore");
@@ -1708,7 +1750,7 @@ export class Room implements RoomState {
 			this.command({ type: "kick", clientId: request.clientId });
 		} else {
 			this.log.warn(
-				`${context.username} tried to kick ${user.username} but failed the role check`
+				`${context.username} tried to kick ${user.username} but failed the role check`,
 			);
 		}
 	}

@@ -1,20 +1,24 @@
-import { sequelize } from "./models";
-import { setupPostgresMetricsCollection } from "./storage.metrics";
-import { conf } from "./ott-config";
-import { getRoomByName, isRoomNameTaken, saveRoom, updateRoom } from "./storage/room";
+import {
+	getRoomByName,
+	isRoomNameTaken,
+	saveRoom,
+	updateRoom,
+	deleteRoom,
+} from "./storage/room.js";
 import {
 	getVideoInfo,
 	getManyVideoInfo,
 	updateVideoInfo,
 	updateManyVideoInfo,
 	getVideoInfoFields,
-} from "./storage/cachedvideo";
+} from "./storage/cachedvideo.js";
 
 export default {
 	getRoomByName,
 	isRoomNameTaken,
 	saveRoom,
 	updateRoom,
+	deleteRoom,
 	getVideoInfo,
 	getManyVideoInfo,
 	updateVideoInfo,

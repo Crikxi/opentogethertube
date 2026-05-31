@@ -1,12 +1,12 @@
-import { getLogger } from "../logger";
-import { conf } from "../ott-config";
-import express, { RequestHandler, ErrorRequestHandler } from "express";
-import { OttApiResponseAddPreview, OttResponseBody } from "ott-common/models/rest-api";
-import { OttException } from "ott-common/exceptions";
-import { BadApiArgumentException } from "../exceptions";
-import InfoExtract from "../infoextractor";
-import { consumeRateLimitPoints } from "../rate-limit";
-import { counterHttpErrors } from "../metrics";
+import { getLogger } from "../logger.js";
+import { conf } from "../ott-config.js";
+import express, { type RequestHandler, type ErrorRequestHandler } from "express";
+import type { OttApiResponseAddPreview, OttResponseBody } from "ott-common/models/rest-api.js";
+import { OttException } from "ott-common/exceptions.js";
+import { BadApiArgumentException } from "../exceptions.js";
+import InfoExtract from "../infoextractor.js";
+import { consumeRateLimitPoints } from "../rate-limit.js";
+import { counterHttpErrors } from "../metrics.js";
 
 const router = express.Router();
 const log = getLogger("api/data");
@@ -14,7 +14,7 @@ const addPreview: RequestHandler<
 	any,
 	OttResponseBody<OttApiResponseAddPreview>,
 	any,
-	{ input: string }
+	{ input: string; adapter?: string }
 > = async (req, res, next) => {
 	if (!req.query.input) {
 		throw new BadApiArgumentException("input", "missing");
@@ -31,12 +31,13 @@ const addPreview: RequestHandler<
 		log.info(`Getting queue add preview for ${req.query.input}`);
 		const result = await InfoExtract.resolveVideoQuery(
 			req.query.input.trim(),
-			conf.get("add_preview.search.provider")
+			conf.get("add_preview.search.provider"),
+			req.query.adapter,
 		);
 
 		res.setHeader(
 			"Cache-Control",
-			`public, max-age=${result.cacheDuration}, immutable, stale-while-revalidate=86400`
+			`public, max-age=${result.cacheDuration}, immutable, stale-while-revalidate=86400`,
 		);
 
 		res.json({
@@ -56,7 +57,11 @@ const addPreview: RequestHandler<
 			err.name === "LocalFileException" ||
 			err.name === "MissingMetadataException" ||
 			err.name === "UnsupportedVideoType" ||
-			err.name === "VideoNotFoundException"
+			err.name === "UpstreamInvidiousException" ||
+			err.name === "VideoNotFoundException" ||
+			err.name === "FfprobeTimeoutError" ||
+			err.name === "OdyseeUnavailableVideo" ||
+			err.name === "OttException"
 		) {
 			log.error(`Unable to get add preview: ${err.name}`);
 			res.status(400).json({

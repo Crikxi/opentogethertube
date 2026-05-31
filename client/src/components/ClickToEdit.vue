@@ -24,7 +24,7 @@
 /**
  * Provides a value display that can be clicked to edit.
  */
-import { ref, nextTick, Ref } from "vue";
+import { ref, nextTick, type Ref } from "vue";
 
 const props = withDefaults(
 	defineProps<{
@@ -34,7 +34,7 @@ const props = withDefaults(
 	{
 		valueFormatter: (value: number): string => value.toString(),
 		valueParser: (value: string): number => parseInt(value, 10),
-	}
+	},
 );
 
 const model = defineModel<T>();
@@ -83,6 +83,7 @@ function abort() {
 }
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
 .editor {
 	width: 10ch;

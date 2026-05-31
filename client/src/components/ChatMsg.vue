@@ -14,7 +14,7 @@
 
 <script lang="ts" setup>
 import ProcessedText from "@/components/ProcessedText.vue";
-import { ChatMessage } from "ott-common";
+import type { ChatMessage } from "ott-common";
 
 defineProps<{
 	msg: ChatMessage;
@@ -26,8 +26,9 @@ const emit = defineEmits<{
 }>();
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
-@import "../variables.scss";
+@use "../variables.scss";
 
 .message {
 	margin: 2px 0;
@@ -57,7 +58,7 @@ const emit = defineEmits<{
 		margin-left: 0;
 	}
 
-	@media screen and (max-width: $sm-max) {
+	@media screen and (max-width: variables.$sm-max) {
 		font-size: 0.8em;
 	}
 }

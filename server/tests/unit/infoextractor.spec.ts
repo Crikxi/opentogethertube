@@ -7,19 +7,19 @@ import {
 	afterAll,
 	afterEach,
 	vi,
-	MockInstance,
+	type MockInstance,
 } from "vitest";
-import InfoExtractor, { initExtractor } from "../../infoextractor";
-import storage from "../../storage";
-import { getMimeType } from "../../mime";
-import YouTubeAdapter from "../../services/youtube";
-import { UnsupportedMimeTypeException, OutOfQuotaException } from "../../exceptions";
-import { ServiceAdapter } from "../../serviceadapter";
-import { buildClients, redisClient } from "../../redisclient";
+import InfoExtractor, { initExtractor } from "../../infoextractor.js";
+import storage from "../../storage.js";
+import { getMimeType } from "../../mime.js";
+import YouTubeAdapter from "../../services/youtube.js";
+import { UnsupportedMimeTypeException, OutOfQuotaException } from "../../exceptions.js";
+import { ServiceAdapter } from "../../serviceadapter.js";
+import { buildClients, redisClient } from "../../redisclient.js";
 import _ from "lodash";
-import { loadModels } from "../../models";
-import { loadConfigFile, conf } from "../../ott-config";
-import { Video, VideoMetadata, VideoService } from "ott-common/models/video";
+import { loadModels } from "../../models/index.js";
+import { loadConfigFile, conf } from "../../ott-config.js";
+import type { Video, VideoMetadata, VideoService } from "ott-common/models/video.js";
 
 class TestAdapter extends ServiceAdapter {
 	get serviceId(): VideoService {
@@ -88,17 +88,17 @@ describe("InfoExtractor", () => {
 
 		it("should use cached search results", async () => {
 			await redisClient.set("search:fakeservice:asdf", JSON.stringify([vid]));
-			let adapter = new TestAdapter();
-			let getAdapterSpy = vi
+			const adapter = new TestAdapter();
+			const getAdapterSpy = vi
 				.spyOn(InfoExtractor, "getServiceAdapter")
 				.mockReturnValue(adapter);
-			let getCacheSpy = vi
+			const getCacheSpy = vi
 				.spyOn(InfoExtractor, "getCachedSearchResults")
 				.mockResolvedValue([vid]);
-			let getManyVideoInfoSpy = vi
+			const getManyVideoInfoSpy = vi
 				.spyOn(InfoExtractor, "getManyVideoInfo")
 				.mockResolvedValue([vid]);
-			let results = await InfoExtractor.searchVideos(adapter.serviceId, "asdf");
+			const results = await InfoExtractor.searchVideos(adapter.serviceId, "asdf");
 			expect(getAdapterSpy).toBeCalledTimes(0);
 			expect(getCacheSpy).toBeCalledTimes(1);
 			expect(getManyVideoInfoSpy).toBeCalledTimes(1);
@@ -112,24 +112,25 @@ describe("InfoExtractor", () => {
 		});
 
 		it("should cache fresh search results", async () => {
-			let adapter = new TestAdapter();
-			let getAdapterSpy = vi
+			const adapter = new TestAdapter();
+			// biome-ignore lint/correctness/noUnusedVariables: biome migration
+			const getAdapterSpy = vi
 				.spyOn(InfoExtractor, "getServiceAdapter")
 				.mockReturnValue(adapter);
-			let getCacheSpy = vi
+			const getCacheSpy = vi
 				.spyOn(InfoExtractor, "getCachedSearchResults")
 				.mockResolvedValue([]);
-			let searchSpy = vi.spyOn(adapter, "searchVideos").mockResolvedValue([
+			const searchSpy = vi.spyOn(adapter, "searchVideos").mockResolvedValue([
 				{
 					service: "direct",
 					id: "asdf1234",
 				},
 			]);
-			let getManyVideoInfoSpy = vi
+			const getManyVideoInfoSpy = vi
 				.spyOn(InfoExtractor, "getManyVideoInfo")
 				.mockResolvedValue([vid]);
 
-			let results = await InfoExtractor.searchVideos(adapter.serviceId, "asdf");
+			const results = await InfoExtractor.searchVideos(adapter.serviceId, "asdf");
 
 			expect(results).toEqual([vid]);
 
@@ -137,7 +138,7 @@ describe("InfoExtractor", () => {
 			expect(getManyVideoInfoSpy).toBeCalledTimes(1);
 			expect(searchSpy).toBeCalledTimes(1);
 			expect(
-				(await redisClient.get(`search:${adapter.serviceId}:asdf`))!.length
+				(await redisClient.get(`search:${adapter.serviceId}:asdf`))!.length,
 			).toBeGreaterThan(0);
 
 			getManyVideoInfoSpy.mockRestore();
@@ -157,7 +158,7 @@ describe("InfoExtractor", () => {
 		let updateCache: MockInstance<[Video[] | Video], Promise<void>>;
 		let adapterFetchVideoInfo: MockInstance;
 		beforeAll(() => {
-			let adapter = new TestAdapter();
+			const adapter = new TestAdapter();
 			getAdapter = vi.spyOn(InfoExtractor, "getServiceAdapter").mockReturnValue(adapter);
 			getCachedVideo = vi
 				.spyOn(InfoExtractor, "getCachedVideo")
@@ -185,7 +186,7 @@ describe("InfoExtractor", () => {
 			adapterFetchVideoInfo.mockRestore();
 		});
 
-		let vid: Video = {
+		const vid: Video = {
 			service: "direct",
 			id: "asdf",
 			title: "title",
@@ -239,7 +240,7 @@ describe("InfoExtractor", () => {
 			]);
 			adapterFetchVideoInfo.mockRejectedValue(new OutOfQuotaException("fake"));
 			expect(await InfoExtractor.getVideoInfo("youtube", "asdf")).toEqual(
-				_.pick(vid, "service", "id", "length")
+				_.pick(vid, "service", "id", "length"),
 			);
 			expect(adapterFetchVideoInfo).toBeCalledTimes(1);
 		});
@@ -252,7 +253,7 @@ describe("InfoExtractor", () => {
 			]);
 			adapterFetchVideoInfo.mockRejectedValue(new OutOfQuotaException("fake"));
 			await expect(InfoExtractor.getVideoInfo("youtube", "asdf")).rejects.toThrowError(
-				OutOfQuotaException
+				OutOfQuotaException,
 			);
 			expect(adapterFetchVideoInfo).toBeCalledTimes(1);
 		});
@@ -265,7 +266,7 @@ describe("InfoExtractor", () => {
 			]);
 			adapterFetchVideoInfo.mockRejectedValue(new Error("fake"));
 			await expect(InfoExtractor.getVideoInfo("youtube", "asdf")).rejects.toThrow(
-				new Error("fake")
+				new Error("fake"),
 			);
 			expect(adapterFetchVideoInfo).toBeCalledTimes(1);
 		});
@@ -281,7 +282,7 @@ describe("InfoExtractor", () => {
 		let adapterFetchManyVideoInfo: MockInstance;
 		let storageGetManyVideoInfo: MockInstance;
 		beforeAll(() => {
-			let adapter = new TestAdapter();
+			const adapter = new TestAdapter();
 			getAdapter = vi.spyOn(InfoExtractor, "getServiceAdapter").mockReturnValue(adapter);
 			getCachedVideo = vi
 				.spyOn(InfoExtractor, "getCachedVideo")
@@ -335,19 +336,19 @@ describe("InfoExtractor", () => {
 		it("should get videos from cache without fetching from adapter", async () => {
 			storageGetManyVideoInfo.mockResolvedValue(vids);
 			expect(
-				await InfoExtractor.getManyVideoInfo(vids.map(vid => _.pick(vid, "service", "id")))
+				await InfoExtractor.getManyVideoInfo(vids.map(vid => _.pick(vid, "service", "id"))),
 			).toEqual(vids);
 			expect(adapterFetchManyVideoInfo).not.toBeCalled();
 		});
 
 		it("should get videos fetching from adapter", async () => {
 			storageGetManyVideoInfo.mockResolvedValue(
-				vids.map(vid => _.pick(vid, "service", "id"))
+				vids.map(vid => _.pick(vid, "service", "id")),
 			);
 			adapterFetchManyVideoInfo.mockResolvedValue(vids);
 			updateCache.mockResolvedValue();
 			expect(
-				await InfoExtractor.getManyVideoInfo(vids.map(vid => _.pick(vid, "service", "id")))
+				await InfoExtractor.getManyVideoInfo(vids.map(vid => _.pick(vid, "service", "id"))),
 			).toEqual(vids);
 			expect(adapterFetchManyVideoInfo).toBeCalledTimes(1);
 			expect(updateCache).toBeCalledTimes(1);
@@ -358,7 +359,7 @@ describe("InfoExtractor", () => {
 			adapterFetchManyVideoInfo.mockResolvedValue(vids);
 			updateCache.mockResolvedValue();
 			expect(
-				await InfoExtractor.getManyVideoInfo(vids.map(vid => _.pick(vid, "service", "id")))
+				await InfoExtractor.getManyVideoInfo(vids.map(vid => _.pick(vid, "service", "id"))),
 			).toEqual(vids);
 			expect(adapterFetchManyVideoInfo).toBeCalledTimes(1);
 			expect(updateCache).toBeCalledTimes(1);
@@ -391,7 +392,7 @@ describe("InfoExtractor: Cache", () => {
 				title: "asdf.mp4",
 			});
 			expect(
-				await InfoExtractor.getCachedVideo("direct", "https://example.com/asdf.mp4")
+				await InfoExtractor.getCachedVideo("direct", "https://example.com/asdf.mp4"),
 			).toEqual([
 				{
 					service: "direct",
@@ -410,7 +411,7 @@ describe("InfoExtractor: Cache", () => {
 				mime: "video/mp4",
 			});
 			expect(
-				await InfoExtractor.getCachedVideo("direct", "https://example.com/asdf.mp4")
+				await InfoExtractor.getCachedVideo("direct", "https://example.com/asdf.mp4"),
 			).toEqual([
 				{
 					service: "direct",
@@ -430,7 +431,7 @@ describe("InfoExtractor: Cache", () => {
 				mime: "invalid",
 			});
 			expect(
-				InfoExtractor.getCachedVideo("direct", "https://example.com/asdf")
+				InfoExtractor.getCachedVideo("direct", "https://example.com/asdf"),
 			).rejects.toThrow(UnsupportedMimeTypeException);
 			expect(storage.getVideoInfo).toBeCalledTimes(1);
 			getVideoInfoSpy.mockReset();

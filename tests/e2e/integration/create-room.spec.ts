@@ -1,4 +1,5 @@
 import faker from "faker";
+// biome-ignore lint/style/noCommonJs: biome migration
 const uuid = require("uuid");
 
 describe("Creating Rooms", () => {
@@ -36,7 +37,7 @@ describe("Creating Rooms", () => {
 			.should("be.visible")
 			.click();
 
-		let roomName: string = uuid.v4().substring(0, 20);
+		const roomName: string = uuid.v4().substring(0, 20);
 		cy.get("form").find("input").first().type(roomName);
 		cy.get("form").submit();
 
@@ -67,7 +68,7 @@ describe("Creating Rooms", () => {
 			.should("be.visible")
 			.click();
 
-		let roomName: string = uuid.v4().substring(0, 20);
+		const roomName: string = uuid.v4().substring(0, 20);
 		cy.get("form").find("input").first().type(roomName);
 		cy.get("form").submit();
 
@@ -113,7 +114,7 @@ describe("Creating Rooms", () => {
 			cy.contains("Create Room").click();
 			cy.get(".v-menu").contains(".v-list-item", "Create Permanent Room").click();
 
-			let roomName = uuid.v4().substring(0, 20);
+			const roomName = uuid.v4().substring(0, 20);
 			cy.get("form").find("input").first().type(roomName);
 			cy.get("form").submit();
 
@@ -137,10 +138,7 @@ describe("Creating Rooms", () => {
 			cy.contains("Settings").click();
 			cy.contains("button", "Claim Room").should("be.visible").click();
 			cy.wait(200);
-			cy.contains("button", "Save")
-				.should("exist")
-				.scrollIntoView()
-				.should("be.visible");
+			cy.contains("button", "Save").should("exist").scrollIntoView().should("be.visible");
 			checkPermissionsEditor();
 		});
 

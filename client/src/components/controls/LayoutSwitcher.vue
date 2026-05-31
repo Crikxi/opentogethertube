@@ -10,10 +10,18 @@
 		<v-icon
 			v-if="store.state.settings.roomLayout === 'theater'"
 			style="transform: scaleX(180%)"
-		>
-			mdi-square-outline
-		</v-icon>
-		<v-icon v-else style="transform: scaleX(130%)"> mdi-square-outline </v-icon>
+			:icon="mdiSquareOutline"
+		/>
+		<v-icon v-else style="transform: scaleX(130%)" :icon="mdiSquareOutline" />
+		<v-tooltip activator="parent" location="bottom" v-model="layoutTooltip">
+			<span>{{
+				$t(
+					store.state.settings.roomLayout === "theater"
+						? "room.default-layout"
+						: "room.theater-mode",
+				)
+			}}</span>
+		</v-tooltip>
 	</v-btn>
 	<v-btn
 		variant="text"
@@ -22,7 +30,7 @@
 		class="media-control"
 		:aria-label="$t('room.toggle-fullscreen')"
 	>
-		<v-icon>mdi-fullscreen-exit</v-icon>
+		<v-icon :icon="mdiFullscreenExit" />
 		<v-tooltip activator="parent" location="bottom">
 			<span>{{ $t("room.toggle-fullscreen") }}</span>
 		</v-tooltip>
@@ -30,12 +38,14 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted } from "vue";
+import { mdiSquareOutline, mdiFullscreenExit } from "@mdi/js";
+import { computed, onMounted, shallowRef } from "vue";
 import { useStore } from "@/store";
 import { RoomLayoutMode } from "@/stores/settings";
 import { useRoomKeyboardShortcuts } from "@/util/keyboard-shortcuts";
 
 const store = useStore();
+const layoutTooltip = shallowRef(false);
 
 const isMobile = computed(() => {
 	return window.matchMedia("only screen and (max-width: 760px)").matches;
@@ -61,6 +71,7 @@ function rotateRoomLayout() {
 	const newLayout =
 		layouts[(layouts.indexOf(store.state.settings.roomLayout) + 1) % layouts.length];
 	store.commit("settings/UPDATE", { roomLayout: newLayout });
+	layoutTooltip.value = false;
 }
 
 const shortcuts = useRoomKeyboardShortcuts();
@@ -73,6 +84,7 @@ onMounted(() => {
 });
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
 @use "./media-controls.scss";
 </style>

@@ -1,12 +1,12 @@
 /* eslint-disable camelcase */
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 import validator from "validator";
 import convict from "convict";
 import toml from "toml";
 import type winston from "winston";
-import { ALL_VIDEO_SERVICES } from "ott-common/constants";
-import { Result, err, ok, intoResult } from "ott-common/result";
+import { ALL_VIDEO_SERVICES } from "ott-common/constants.js";
+import { type Result, err, ok, intoResult } from "ott-common/result.js";
 
 convict.addParser({ extension: "toml", parse: toml.parse });
 
@@ -20,7 +20,7 @@ convict.addFormat({
 			throw new Error("Balancer config must be an array");
 		}
 
-		for (let source of sources) {
+		for (const source of sources) {
 			convict(schema.children).load(source).validate();
 		}
 	},
@@ -270,7 +270,19 @@ export const conf = convict({
 		},
 		peertube: {
 			instances: {
-				default: ["the.jokertv.eu", "tube.shanti.cafe", "video.antopie.org"],
+				default: [
+					"video.sadmin.io",
+					"tube.shanti.cafe",
+					"video.antopie.org",
+					"peertube.tmp.rcp.tf",
+					"dalek.zone",
+					"video.4d2.org",
+					"peertube.foxfam.club",
+					"peertube.1312.media",
+					"video.sadmin.io",
+					"videos.brookslawson.com",
+					"video.chadwaltercummings.me",
+				],
 				doc: "List of Peertube instances to allow.",
 				format: Array,
 				env: "PEERTUBE_INSTANCES",
@@ -283,6 +295,17 @@ export const conf = convict({
 				doc: "Whether to emit Peertube videos as direct or hls videos instead of Peertube videos. This is useful if the Peertube embeds are broken.",
 				format: Boolean,
 				env: "PEERTUBE_EMIT_AS_DIRECT",
+			},
+		},
+		invidious: {
+			instances: {
+				default: ["yt.safh.de", "inv.nadeko.net", "yewtu.be"],
+				doc: "List of Invidious instances as array",
+				format: Array,
+				env: "INVIDIOUS_INSTANCES",
+				children: {
+					format: String,
+				},
 			},
 		},
 	},
@@ -470,9 +493,9 @@ function getExtraBaseConfig(): string | undefined {
 }
 
 export function loadConfigFile() {
-	let extraBaseConfig = getExtraBaseConfig();
+	const extraBaseConfig = getExtraBaseConfig();
 	if (extraBaseConfig) {
-		let extraBaseConfigPath = path.resolve(process.cwd(), `../env/${extraBaseConfig}`);
+		const extraBaseConfigPath = path.resolve(process.cwd(), `../env/${extraBaseConfig}`);
 		if (fs.existsSync(extraBaseConfigPath)) {
 			log.info(`Loading extra base config from ${extraBaseConfigPath}`);
 			conf.loadFile(extraBaseConfigPath);
@@ -489,8 +512,8 @@ export function loadConfigFile() {
 		log.warn(`No config found at ${configPath}`);
 	}
 
-	let environment = conf.get("env");
-	let envConfigPath = path.resolve(process.cwd(), `../env/${environment}.toml`);
+	const environment = conf.get("env");
+	const envConfigPath = path.resolve(process.cwd(), `../env/${environment}.toml`);
 	if (fs.existsSync(envConfigPath)) {
 		log.info(`Loading environment config from ${envConfigPath}`);
 		conf.loadFile(envConfigPath);
@@ -522,7 +545,7 @@ export function validateConfig(): Result<void, Error> {
 
 	if (conf.get("session_secret").length < 80) {
 		log.error(
-			"session_secret must be at least 80 characters long. Use a password generator to generate a secure alphanumeric secret."
+			"session_secret must be at least 80 characters long. Use a password generator to generate a secure alphanumeric secret.",
 		);
 		log.error("This can also be set with the SESSION_SECRET environment variable.");
 		return err(new Error("Invalid configuration."));

@@ -5,52 +5,39 @@
 		:disabled="!supported"
 		class="media-control"
 		aria-label="Closed Captions"
+		@click="toggleCaptions()"
 	>
-		<v-icon>mdi-closed-caption</v-icon>
-		<v-menu location="top" offset-y activator="parent" :disabled="!supported">
-			<v-list>
-				<v-list-item
-					link
-					@click="setCaptionsEnabled(true)"
-					v-if="captions.captionsTracks.value.length === 0"
-				>
-					{{ $t("common.on") }}
-				</v-list-item>
-				<v-list-item
-					link
-					@click="setCaptionsTrack(track)"
-					v-for="(track, idx) in captions.captionsTracks.value"
-					:key="idx"
-				>
-					{{ track }}
-				</v-list-item>
-				<v-list-item link @click="setCaptionsEnabled(false)">
-					{{ $t("common.off") }}
-				</v-list-item>
-			</v-list>
-		</v-menu>
+		<v-icon :icon="enabled ? mdiClosedCaption : mdiClosedCaptionOutline" />
+		<v-tooltip activator="parent" location="bottom">
+			{{ $t("room.subtitles") }}
+		</v-tooltip>
 	</v-btn>
 </template>
 
 <script lang="ts" setup>
+import { computed } from "vue";
+import { mdiClosedCaption, mdiClosedCaptionOutline } from "@mdi/js";
 import { useCaptions } from "../composables";
+import { useStore } from "@/store";
 
+const store = useStore();
 const captions = useCaptions();
 
-function setCaptionsEnabled(value: boolean) {
-	captions.isCaptionsEnabled.value = value;
-}
-
-function setCaptionsTrack(value: string) {
-	if (!captions.isCaptionsEnabled.value) {
-		captions.isCaptionsEnabled.value = true;
+const supported = computed(() => {
+	// For YouTube, always enable caption switch, since its api doesn't return tracklist
+	if (store.state.room.currentSource?.service === "youtube") {
+		return true;
 	}
-	captions.currentTrack.value = value;
-}
+	return captions.isCaptionsSupported.value && captions.captionsTracks.value.length > 0;
+});
+const enabled = computed(() => captions.isCaptionsEnabled.value);
 
-const supported = captions.isCaptionsSupported;
+function toggleCaptions() {
+	captions.isCaptionsEnabled.value = !captions.isCaptionsEnabled.value;
+}
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
 @use "./media-controls.scss";
 </style>

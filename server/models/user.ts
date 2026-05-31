@@ -1,6 +1,6 @@
-import { Sequelize, Model, DataTypes, Optional } from "sequelize";
-import { UserAccountAttributes } from "ott-common/models/types";
-import { conf } from "../ott-config";
+import { type Sequelize, Model, DataTypes, type Optional } from "sequelize";
+import type { UserAccountAttributes } from "ott-common/models/types.js";
+import { conf } from "../ott-config.js";
 
 type UserCreationAttributes = Optional<UserAccountAttributes, "id">;
 
@@ -41,7 +41,7 @@ export const createModel = (sequelize: Sequelize) => {
 				validate: {
 					isEmail: {
 						// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-						// @ts-ignore because I think the type annotation is wrong.
+						// @ts-expect-error because I think the type annotation is wrong.
 						args: [
 							{
 								require_tld: conf.get("env") === "production",
@@ -73,12 +73,12 @@ export const createModel = (sequelize: Sequelize) => {
 				ensureCredentials() {
 					if ((!this.username || !this.hash || !this.salt) && !this.discordId) {
 						throw new Error(
-							"Incomplete login credentials. Requires social login or username/password."
+							"Incomplete login credentials. Requires social login or username/password.",
 						);
 					}
 				},
 			},
-		}
+		},
 	);
 	// // eslint-disable-next-line no-unused-vars
 	// User.associate = function(models) {

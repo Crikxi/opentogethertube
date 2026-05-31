@@ -1,11 +1,13 @@
-import { URL } from "url";
-import axios, { AxiosResponse } from "axios";
-import { ServiceAdapter } from "../serviceadapter";
-import { InvalidVideoIdException } from "../exceptions";
-import { Video } from "ott-common/models/video";
-import { getLogger } from "../logger";
+import { URL } from "node:url";
+import axios, { type AxiosResponse } from "axios";
+import { ServiceAdapter } from "../serviceadapter.js";
+import { InvalidVideoIdException } from "../exceptions.js";
+import type { Video } from "ott-common/models/video.js";
+import { getLogger } from "../logger.js";
 
 const log = getLogger("vimeo");
+const VIMEO_VIDEO_PATH_REGEX = /^\/\d+$/;
+const VIMEO_NUMERIC_ID_REGEX = /^\d+$/;
 
 interface VimeoApiVideo {
 	title: string;
@@ -29,7 +31,8 @@ export default class VimeoAdapter extends ServiceAdapter {
 
 	canHandleURL(link: string): boolean {
 		const url = new URL(link);
-		return url.host.endsWith("vimeo.com") && /^\/\d+$/.test(url.pathname);
+		const isVimeoHost = url.hostname === "vimeo.com" || url.hostname.endsWith(".vimeo.com");
+		return isVimeoHost && VIMEO_VIDEO_PATH_REGEX.test(url.pathname);
 	}
 
 	isCollectionURL(link: string): boolean {
@@ -42,7 +45,7 @@ export default class VimeoAdapter extends ServiceAdapter {
 	}
 
 	async fetchVideoInfo(videoId: string): Promise<Video> {
-		if (!/^\d+$/.test(videoId)) {
+		if (!VIMEO_NUMERIC_ID_REGEX.test(videoId)) {
 			throw new InvalidVideoIdException(this.serviceId, videoId);
 		}
 

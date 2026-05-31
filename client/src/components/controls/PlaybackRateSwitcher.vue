@@ -2,8 +2,11 @@
 	<v-btn variant="text" class="media-control" aria-label="Playback Speed" :disabled="!supported">
 		{{ formatRate(playbackRate.playbackRate.value) }}
 
-		<v-menu location="top" activator="parent">
-			<v-list>
+		<v-tooltip activator="parent" location="bottom">
+			<span>{{ $t("room.playback-speed") }}</span>
+		</v-tooltip>
+		<v-menu location="top" activator="parent" offset="+30px">
+			<v-list class="playback-rate-menu">
 				<v-list-item
 					v-for="(rate, index) in playbackRate.availablePlaybackRates.value"
 					:key="index"
@@ -27,11 +30,9 @@ const roomApi = useRoomApi(connection);
 const playbackRate = usePlaybackRate();
 
 function formatRate(rate: number) {
-	return (
-		rate.toLocaleString(undefined, {
-			maximumFractionDigits: 2,
-		}) + "x"
-	);
+	return `${rate.toLocaleString(undefined, {
+		maximumFractionDigits: 2,
+	})}x`;
 }
 
 function setRate(rate: number) {
@@ -41,6 +42,12 @@ function setRate(rate: number) {
 const supported = playbackRate.isPlaybackRateSupported;
 </script>
 
+<!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
 @use "./media-controls.scss";
+
+.playback-rate-menu {
+	background-color: media-controls.$menu-background !important;
+	border-radius: media-controls.$menu-radius !important;
+}
 </style>

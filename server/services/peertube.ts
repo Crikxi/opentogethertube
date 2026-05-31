@@ -1,8 +1,10 @@
 import axios, { type AxiosResponse } from "axios";
-import { ServiceAdapter } from "../serviceadapter";
-import { conf } from "../ott-config";
-import { Video, VideoMetadata, VideoService } from "ott-common/models/video";
-import { InvalidVideoIdException } from "../exceptions";
+import { ServiceAdapter } from "../serviceadapter.js";
+import { conf } from "../ott-config.js";
+import type { Video, VideoMetadata, VideoService } from "ott-common/models/video.js";
+import { InvalidVideoIdException } from "../exceptions.js";
+
+const PEERTUBE_WATCH_PATH_REGEX = /^\/w\/\w+/;
 
 interface PeertubeApiVideo {
 	uuid: string;
@@ -47,7 +49,7 @@ export default class PeertubeAdapter extends ServiceAdapter {
 
 	canHandleURL(link: string): boolean {
 		const url = new URL(link);
-		return this.allowedHosts.includes(url.host) && /^\/w\/\w+/.test(url.pathname);
+		return this.allowedHosts.includes(url.host) && PEERTUBE_WATCH_PATH_REGEX.test(url.pathname);
 	}
 
 	isCollectionURL(link: string): boolean {
@@ -67,7 +69,7 @@ export default class PeertubeAdapter extends ServiceAdapter {
 		const [host, id] = videoId.split(":");
 
 		const result: AxiosResponse<PeertubeApiVideo> = await this.api.get(
-			`https://${host}/api/v1/videos/${id}`
+			`https://${host}/api/v1/videos/${id}`,
 		);
 
 		if (conf.get("info_extractor.peertube.emit_as_direct")) {

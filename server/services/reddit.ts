@@ -1,13 +1,14 @@
-import { URL } from "url";
+import { URL } from "node:url";
 import axios from "axios";
-import { ServiceAdapter, VideoRequest } from "../serviceadapter";
-import { getLogger } from "../logger";
-import { Video, VideoMetadata } from "ott-common/models/video";
-import { InvalidVideoIdException } from "../exceptions";
-import infoextractor from "../infoextractor";
-import { conf } from "../ott-config";
+import { ServiceAdapter } from "../serviceadapter.js";
+import { getLogger } from "../logger.js";
+import type { Video, VideoMetadata } from "ott-common/models/video.js";
+import { InvalidVideoIdException } from "../exceptions.js";
+import { conf } from "../ott-config.js";
 
 const log = getLogger("reddit");
+const REDDIT_SUBREDDIT_PATH_REGEX = /^\/r\/.+$/;
+const REDDIT_COMMENTS_PATH_REGEX = /\/comments\/.+/;
 
 export interface RedditListing<T> {
 	kind: "Listing";
@@ -92,7 +93,8 @@ export default class RedditAdapter extends ServiceAdapter {
 		const url = new URL(link);
 		return (
 			url.host.endsWith("reddit.com") &&
-			(/^\/r\/.+$/.test(url.pathname) || /\/comments\/.+/.test(url.pathname))
+			(REDDIT_SUBREDDIT_PATH_REGEX.test(url.pathname) ||
+				REDDIT_COMMENTS_PATH_REGEX.test(url.pathname))
 		);
 	}
 
@@ -112,9 +114,9 @@ export default class RedditAdapter extends ServiceAdapter {
 	}
 
 	async fetchRedditUrl(
-		link: string
+		link: string,
 	): Promise<RedditListing<RedditListableThing>[] | RedditListing<RedditListableThing>> {
-		let resp = await this.api.get(link);
+		const resp = await this.api.get(link);
 		if (Array.isArray(resp.data)) {
 			return resp.data as RedditListing<RedditListableThing>[];
 		}
@@ -153,14 +155,14 @@ export default class RedditAdapter extends ServiceAdapter {
 	}
 
 	getVideoId(url: string): string {
-		let fragments = url.split("/");
-		let idx = fragments.indexOf("comments");
+		const fragments = url.split("/");
+		const idx = fragments.indexOf("comments");
 		return fragments[idx + 1];
 	}
 
-	async fetchVideoInfo(id: string, properties?: (keyof VideoMetadata)[]): Promise<Video> {
-		let resp = await this.fetchRedditUrl(`https://reddit.com/comments/${id}.json`);
-		let video = this.extractVideos(resp[0])[0];
+	async fetchVideoInfo(id: string, _properties?: (keyof VideoMetadata)[]): Promise<Video> {
+		const resp = await this.fetchRedditUrl(`https://reddit.com/comments/${id}.json`);
+		const video = this.extractVideos(resp[0])[0];
 		if ("url" in video) {
 			throw new InvalidVideoIdException(this.serviceId, id);
 		}

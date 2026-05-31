@@ -1,5 +1,5 @@
 import type { Category, Segment } from "sponsorblock-api";
-import {
+import type {
 	ClientId,
 	ClientInfo,
 	QueueMode,
@@ -11,8 +11,8 @@ import {
 	RoomSettings,
 	AuthToken,
 	BehaviorOption,
-} from "./types";
-import { QueueItem, VideoId } from "./video";
+} from "./types.js";
+import type { QueueItem, QueueItemExtras, VideoId, VideoAdd } from "./video.js";
 
 export type ServerMessage =
 	| ServerMessageSync
@@ -204,7 +204,8 @@ export type RoomRequest =
 	| ShuffleRequest
 	| PlaybackSpeedRequest
 	| RestoreQueueRequest
-	| KickRequest;
+	| KickRequest
+	| UpdateQueueItemRequest;
 
 export enum RoomRequestType {
 	JoinRequest,
@@ -226,6 +227,7 @@ export enum RoomRequestType {
 	PlaybackSpeedRequest,
 	RestoreQueueRequest,
 	KickRequest,
+	UpdateQueueItemRequest,
 }
 
 export interface RoomRequestBase {
@@ -257,14 +259,20 @@ export interface SeekRequest extends RoomRequestBase {
 
 export interface AddRequest extends RoomRequestBase {
 	type: RoomRequestType.AddRequest;
-	video?: VideoId;
-	videos?: VideoId[];
+	video?: VideoAdd;
+	videos?: VideoAdd[];
 	url?: string;
 }
 
 export interface RemoveRequest extends RoomRequestBase {
 	type: RoomRequestType.RemoveRequest;
 	video: VideoId;
+}
+
+export interface UpdateQueueItemRequest extends RoomRequestBase {
+	type: RoomRequestType.UpdateQueueItemRequest;
+	video: VideoId;
+	update: QueueItemExtras;
 }
 
 export interface OrderRequest extends RoomRequestBase {
@@ -313,7 +321,7 @@ export interface ApplySettingsRequest extends RoomRequestBase {
  */
 export interface PlayNowRequest extends RoomRequestBase {
 	type: RoomRequestType.PlayNowRequest;
-	video: VideoId;
+	video: VideoAdd;
 }
 
 export interface ShuffleRequest extends RoomRequestBase {

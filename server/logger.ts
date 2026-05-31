@@ -1,12 +1,11 @@
 import { createLogger, format, transports } from "winston";
 import colors from "ansi-colors";
-import { conf } from "./ott-config";
-import { Counter } from "prom-client";
+import { conf } from "./ott-config.js";
 
 const myFormat = format.printf(({ level, message, timestamp, namespace, roomName, roomEvent }) => {
 	if (roomEvent) {
 		// HACK: video descriptions are long, so remove then to make logs easier to read.
-		if (roomEvent.parameters && roomEvent.parameters.video) {
+		if (roomEvent.parameters?.video) {
 			delete roomEvent.parameters.video.description;
 		}
 		return `${timestamp} ${namespace} Room/${
@@ -52,7 +51,7 @@ const logger = createLogger({
 		format.timestamp({
 			format: "YYYY-MM-DD HH:mm:ss",
 		}),
-		myFormat
+		myFormat,
 	),
 });
 
@@ -65,13 +64,13 @@ if (conf.get("env") !== "production") {
 		new transports.Console({
 			format: format.combine(customColorizer(), myFormat),
 			silent: conf.get("env") === "test",
-		})
+		}),
 	);
 } else {
 	logger.add(
 		new transports.Console({
 			format: format.combine(customColorizer(), myFormat),
-		})
+		}),
 	);
 }
 

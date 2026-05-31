@@ -1,17 +1,15 @@
 import { v4 as uuidv4 } from "uuid";
-import EventEmitter from "events";
+import EventEmitter from "node:events";
 import WebSocket from "ws";
 
-import { getLogger } from "./logger";
-import { conf } from "./ott-config";
-import { Result, err, ok, intoResult } from "ott-common/result";
-import { AuthToken, ClientId } from "ott-common/models/types";
-import { replacer } from "ott-common/serialize";
-import { OttWebsocketError } from "ott-common/models/types";
-import roommanager from "./roommanager";
-import type { RoomListItem } from "./api/room";
+import { getLogger } from "./logger.js";
+import { conf } from "./ott-config.js";
+import { type Result, err, ok, intoResult } from "ott-common/result.js";
+import { replacer } from "ott-common/serialize.js";
+import roommanager from "./roommanager.js";
+import type { RoomListItem } from "ott-common/models/rest-api.js";
 import _ from "lodash";
-import type { MsgB2M, MsgM2B, UnloadReason } from "./generated";
+import type { MsgB2M, MsgM2B, UnloadReason } from "./generated.js";
 import { Gauge } from "prom-client";
 export type { MsgB2M, MsgM2B };
 
@@ -46,8 +44,8 @@ export function initBalancerConnections() {
 	wss.on("listening", () => {
 		log.info(
 			`Load balancing is enabled. Listening for balancers on port ${conf.get(
-				"balancing.port"
-			)}`
+				"balancing.port",
+			)}`,
 		);
 	});
 }
@@ -168,7 +166,7 @@ class BalancerManager {
 					resolve();
 				});
 				setTimeout(reject, 1000 * 10, new Error("Balancer did not disconnect in time"));
-				let result = conn.disconnect(1001, "Server shutting down");
+				const result = conn.disconnect(1001, "Server shutting down");
 				if (!result.ok) {
 					log.error(`Error disconnecting from balancer ${conn.id}: ${result.value}`);
 				}
@@ -206,23 +204,23 @@ export type BalancerManagerEvemts = BalancerConnectionEvents;
 export type BalancerManagerEventHandlers<E> = E extends "connect"
 	? (conn: BalancerConnection) => void
 	: E extends "disconnect"
-	? (conn: BalancerConnection) => void
-	: E extends "message"
-	? (conn: BalancerConnection, message: MsgB2M) => void
-	: E extends "error"
-	? (conn: BalancerConnection, error: WebSocket.ErrorEvent) => void
-	: never;
+		? (conn: BalancerConnection) => void
+		: E extends "message"
+			? (conn: BalancerConnection, message: MsgB2M) => void
+			: E extends "error"
+				? (conn: BalancerConnection, error: WebSocket.ErrorEvent) => void
+				: never;
 
 export type BalancerConnectionEvents = "connect" | "disconnect" | "message" | "error";
 export type BalancerConnectionEventHandlers<E> = E extends "connect"
 	? () => void
 	: E extends "disconnect"
-	? (code: number, reason: string) => void
-	: E extends "message"
-	? (message: MsgB2M) => void
-	: E extends "error"
-	? (error: WebSocket.ErrorEvent) => void
-	: never;
+		? (code: number, reason: string) => void
+		: E extends "message"
+			? (message: MsgB2M) => void
+			: E extends "error"
+				? (error: WebSocket.ErrorEvent) => void
+				: never;
 
 export abstract class BalancerConnection {
 	/** A local identifier for the balancer. Other monoliths will have different IDs for the same balancer. */
@@ -297,11 +295,11 @@ export class BalancerConnectionReal extends BalancerConnection {
 	}
 
 	private onSocketMessage(data: WebSocket.Data) {
-		let result = intoResult(() => JSON.parse(data.toString()));
+		const result = intoResult(() => JSON.parse(data.toString()));
 		if (result.ok) {
 			if (!validateB2M(result.value)) {
 				log.error(
-					`Error validating incoming balancer message: ${JSON.stringify(result.value)}`
+					`Error validating incoming balancer message: ${JSON.stringify(result.value)}`,
 				);
 				return;
 			}
@@ -369,7 +367,7 @@ async function onRoomLoad(roomName: string) {
 	const result = await roommanager.getRoom(roomName, { mustAlreadyBeLoaded: true });
 	if (!result.ok) {
 		log.error(
-			`Failed to grab room that should have been loaded. Can't inform balancers. room=${roomName}: ${result.value}`
+			`Failed to grab room that should have been loaded. Can't inform balancers. room=${roomName}: ${result.value}`,
 		);
 		return;
 	}
@@ -437,6 +435,7 @@ const gossipDebounced = _.debounce(gossip, 1000 * 20, { trailing: true, maxWait:
 
 interface GossipRoom extends RoomListItem {}
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const gaugeBalancerConnections = new Gauge({
 	name: "ott_balancer_connections",
 	help: "Number of balancer connections",

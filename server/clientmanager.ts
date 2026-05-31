@@ -1,40 +1,42 @@
-import express from "express";
-import WebSocket from "ws";
-import _ from "lodash";
-import { wss } from "./websockets";
-import { getLogger } from "./logger";
-import { Request } from "express";
-import { createSubscriber, redisClient } from "./redisclient";
+import type express from "express";
+import type WebSocket from "ws";
+import { wss } from "./websockets.js";
+import { getLogger } from "./logger.js";
+import type { Request } from "express";
+import { createSubscriber } from "./redisclient.js";
 import {
-	ClientMessage,
-	ClientMessageKickMe,
-	RoomRequest,
+	type ClientMessage,
+	type RoomRequest,
 	RoomRequestType,
-	ServerMessage,
-	ServerMessageSync,
-	ServerMessageUser,
-	ServerMessageYou,
-} from "ott-common/models/messages";
-import { ClientNotFoundInRoomException, MissingToken } from "./exceptions";
-import { MySession, OttWebsocketError, AuthToken, ClientId } from "ott-common/models/types";
-import roommanager from "./roommanager";
-import { ANNOUNCEMENT_CHANNEL, ROOM_NAME_REGEX } from "ott-common/constants";
-import tokens, { SessionInfo } from "./auth/tokens";
-import { RoomStateSyncable } from "./room";
-import { Gauge } from "prom-client";
-import { replacer } from "ott-common/serialize";
-import { Client, ClientJoinStatus, DirectClient, BalancerClient } from "./client";
+	type ServerMessage,
+	type ServerMessageSync,
+	type ServerMessageUser,
+	type ServerMessageYou,
+} from "ott-common/models/messages.js";
+import { ClientNotFoundInRoomException, MissingToken } from "./exceptions.js";
 import {
-	BalancerConnection,
-	MsgB2M,
+	type MySession,
+	OttWebsocketError,
+	type AuthToken,
+	type ClientId,
+} from "ott-common/models/types.js";
+import roommanager from "./roommanager.js";
+import { ANNOUNCEMENT_CHANNEL, ROOM_NAME_REGEX } from "ott-common/constants.js";
+import tokens, { type SessionInfo } from "./auth/tokens.js";
+import { Gauge } from "prom-client";
+import { replacer } from "ott-common/serialize.js";
+import { type Client, ClientJoinStatus, DirectClient, BalancerClient } from "./client.js";
+import {
+	type BalancerConnection,
+	type MsgB2M,
 	balancerManager,
 	buildGossipMessage,
 	initBalancerConnections,
-} from "./balancer";
-import usermanager from "./usermanager";
-import { OttException } from "ott-common/exceptions";
-import { conf } from "./ott-config";
-import { UnloadReason } from "./generated";
+} from "./balancer.js";
+import usermanager from "./usermanager.js";
+import { OttException } from "ott-common/exceptions.js";
+import { conf } from "./ott-config.js";
+import { UnloadReason } from "./generated.js";
 
 const log = getLogger("clientmanager");
 
@@ -136,7 +138,7 @@ async function onClientAuth(client: Client, token: AuthToken, session: SessionIn
 	// full sync
 	const syncMsg = Object.assign(
 		{ action: "sync" },
-		room.syncableState()
+		room.syncableState(),
 	) as unknown as ServerMessageSync;
 	client.send(syncMsg);
 
@@ -184,7 +186,7 @@ async function onClientMessage(client: Client, msg: ClientMessage) {
 			client.kick(msg.reason ?? OttWebsocketError.UNKNOWN);
 			return;
 		} else if (msg.action === "status") {
-			let request: RoomRequest = {
+			const request: RoomRequest = {
 				type: RoomRequestType.UpdateUser,
 				info: {
 					id: client.id,
@@ -206,7 +208,7 @@ async function onClientMessage(client: Client, msg: ClientMessage) {
 		}
 	} catch (err) {
 		log.error(
-			`Failed to process client (id=${client.id}, room=${client.room}) message (action=${msg.action}): ${err}`
+			`Failed to process client (id=${client.id}, room=${client.room}) message (action=${msg.action}): ${err}`,
 		);
 		if (err instanceof OttException) {
 			if (err instanceof MissingToken) {
@@ -224,13 +226,13 @@ async function onClientDisconnect(client: Client) {
 	log.debug(`Client ${client.id} disconnected`);
 	const index = connections.indexOf(client);
 	if (index !== -1) {
-		let clients = connections.splice(index, 1);
+		const clients = connections.splice(index, 1);
 		if (clients.length !== 1) {
 			log.error("failed to remove client from connections");
 			return;
 		}
-		let client = clients[0];
-		let joins = roomJoins.get(client.room);
+		const client = clients[0];
+		const joins = roomJoins.get(client.room);
 		if (joins) {
 			const index = joins.indexOf(client);
 			if (index !== -1) {
@@ -247,7 +249,7 @@ async function onClientDisconnect(client: Client) {
 	const result = await roommanager.getRoom(client.room, { mustAlreadyBeLoaded: true });
 	if (!result.ok) {
 		log.error(
-			`Failed to get room ${client.room} when processing disconnect: ${result.value.name}: ${result.value.message}`
+			`Failed to get room ${client.room} when processing disconnect: ${result.value.name}: ${result.value.message}`,
 		);
 		return;
 	}
@@ -258,7 +260,7 @@ async function onClientDisconnect(client: Client) {
 			{
 				type: RoomRequestType.LeaveRequest,
 			},
-			client.id
+			client.id,
 		);
 	} catch (err) {
 		log.error(`Failed to process leave request for client ${client.id}: ${err}`);
@@ -297,7 +299,7 @@ function onBalancerDisconnect(conn: BalancerConnection) {
 }
 
 async function onBalancerMessage(conn: BalancerConnection, message: MsgB2M) {
-	log.silly("balancer message: " + JSON.stringify(message));
+	log.silly(`balancer message: ${JSON.stringify(message)}`);
 
 	/**
 	 * This is a type that maps the message type to the handler for that message type.
@@ -306,7 +308,7 @@ async function onBalancerMessage(conn: BalancerConnection, message: MsgB2M) {
 	 */
 	type EnumHandler<T extends { type: string; payload: T["payload"] }> = {
 		[P in T["type"]]: (
-			instruction: Extract<T, { type: P; payload: T["payload"] }>
+			instruction: Extract<T, { type: P; payload: T["payload"] }>,
 		) => Promise<void>;
 	};
 
@@ -338,7 +340,7 @@ async function onBalancerMessage(conn: BalancerConnection, message: MsgB2M) {
 				client.leave();
 			} else {
 				log.error(
-					`Balancer tried to make client leave that does not exist or is not a balancer client`
+					`Balancer tried to make client leave that does not exist or is not a balancer client`,
 				);
 			}
 		},
@@ -349,7 +351,7 @@ async function onBalancerMessage(conn: BalancerConnection, message: MsgB2M) {
 				client.receiveMessage(msg.payload as ClientMessage);
 			} else {
 				log.error(
-					`Balancer sent message for client that does not exist or is not a balancer client`
+					`Balancer sent message for client that does not exist or is not a balancer client`,
 				);
 			}
 		},
@@ -533,6 +535,7 @@ export interface CmdKick extends CmdBase {
 	clientId: ClientId;
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const gaugeWebsocketConnections = new Gauge({
 	name: "ott_websocket_connections",
 	help: "The number of active websocket connections (deprecated)",
@@ -541,6 +544,7 @@ const gaugeWebsocketConnections = new Gauge({
 	},
 });
 
+// biome-ignore lint/correctness/noUnusedVariables: biome migration
 const gaugeClients = new Gauge({
 	name: "ott_clients_connected",
 	help: "The number of clients connected.",
@@ -548,7 +552,7 @@ const gaugeClients = new Gauge({
 	collect() {
 		this.reset();
 		for (const client of connections) {
-			const clientType = client instanceof DirectClient ? "direct" : "balancer";
+			const clientType = client instanceof DirectClient ? "direct" : "balancer.js";
 			this.labels(clientType, ClientJoinStatus[client.joinStatus]).inc();
 		}
 	},

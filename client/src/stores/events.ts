@@ -1,11 +1,11 @@
 // Ignoring because this rule is wrong. all the template strings in here use strings.
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-import { Module } from "vuex";
+import type { Module } from "vuex";
 import { ToastStyle } from "@/models/toast";
 import {
 	RoomRequestType,
-	ServerMessageEvent,
-	ServerMessageEventCustom,
+	type ServerMessageEvent,
+	type ServerMessageEventCustom,
 } from "ott-common/models/messages";
 import { secondsToTimestamp } from "@/util/timestamp";
 
@@ -29,7 +29,7 @@ export const eventsModule: Module<unknown, unknown> = {
 				duration = 20000;
 			} else if (message.request.type === RoomRequestType.SeekRequest) {
 				text = `${message.user.name} seeked to ${secondsToTimestamp(
-					message.request.value
+					message.request.value,
 				)}`;
 				duration = 20000;
 			} else if (message.request.type === RoomRequestType.JoinRequest) {
@@ -55,6 +55,13 @@ export const eventsModule: Module<unknown, unknown> = {
 					text = `${message.user.name} removed a video`;
 				}
 				duration = 20000;
+			} else if (message.request.type === RoomRequestType.UpdateQueueItemRequest) {
+				if (message.additional.video) {
+					text = `${message.user.name} updated ${message.additional.video.title}'s settings`;
+				} else {
+					text = `${message.user.name} updated a video's settings`;
+				}
+				duration = 20000;
 			} else {
 				text = `${message.user.name} triggered event ${message.request.type}`;
 			}
@@ -66,7 +73,7 @@ export const eventsModule: Module<unknown, unknown> = {
 				event: message,
 			});
 		},
-		eventcustom(context, message: ServerMessageEventCustom) {
+		eventcustom(_context, message: ServerMessageEventCustom) {
 			this.commit("toast/ADD_TOAST", {
 				style: ToastStyle.Neutral,
 				content: message.text,

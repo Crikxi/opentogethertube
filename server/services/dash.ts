@@ -1,19 +1,19 @@
-import URL from "url";
-import _ from "lodash";
-import { ServiceAdapter } from "../serviceadapter";
+import URL from "node:url";
+import { ServiceAdapter } from "../serviceadapter.js";
 import {
 	LocalFileException,
 	UnsupportedMimeTypeException,
 	UnsupportedVideoType,
-} from "../exceptions";
-import { getMimeType, isSupportedMimeType } from "../mime";
-import { getLogger } from "../logger";
-import { Video } from "ott-common/models/video";
+} from "../exceptions.js";
+import { getMimeType, isSupportedMimeType } from "../mime.js";
+import { getLogger } from "../logger.js";
+import type { Video } from "ott-common/models/video.js";
 import { DashMPD } from "@liveinstantly/dash-mpd-parser";
 import axios from "axios";
-import { parseIso8601Duration } from "./parsing/iso8601";
+import { parseIso8601Duration } from "./parsing/iso8601.js";
 
 const log = getLogger("dash");
+const DASH_URL_REGEX = /\/*\.(mpd)$/;
 
 export default class DashVideoAdapter extends ServiceAdapter {
 	get serviceId(): "dash" {
@@ -34,7 +34,7 @@ export default class DashVideoAdapter extends ServiceAdapter {
 
 	canHandleURL(link: string): boolean {
 		const url = URL.parse(link);
-		return /\/*\.(mpd)$/.test((url.path ?? "/").split("?")[0]);
+		return DASH_URL_REGEX.test((url.path ?? "/").split("?")[0]);
 	}
 
 	async fetchVideoInfo(link: string): Promise<Video> {
@@ -92,10 +92,10 @@ export default class DashVideoAdapter extends ServiceAdapter {
 	extractTitle(manifest: any): string | undefined {
 		try {
 			if ("ProgramInformation" in manifest["MPD"]) {
-				return manifest["MPD"]["ProgramInformation"]["Title"];
+				return manifest?.MPD?.ProgramInformation?.Title;
 			}
 
-			const periods = manifest["MPD"]["Period"];
+			const periods = manifest?.MPD?.Period;
 			for (const period of periods) {
 				const adaptationSets = period["AdaptationSet"];
 				for (const adaptationSet of adaptationSets) {

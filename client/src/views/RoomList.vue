@@ -5,7 +5,7 @@
 				<v-progress-circular indeterminate />
 			</v-col>
 		</v-row>
-		<v-row v-if="rooms.length == 0 && !isLoading" class="center-shit" style="width: 100%">
+		<v-row v-if="rooms.length === 0 && !isLoading" class="center-shit" style="width: 100%">
 			<div>
 				<h1>{{ $t("room-list.no-rooms") }}</h1>
 				<v-btn elevation="12" size="x-large" @click="createRoom">{{
@@ -18,7 +18,7 @@
 				<v-card hover class="room" :to="`/room/${room.name}`">
 					<v-img
 						:src="
-							room.currentSource && room.currentSource.thumbnail
+							room.currentSource?.thumbnail
 								? room.currentSource.thumbnail
 								: placeholderUrl
 						"
@@ -26,7 +26,7 @@
 						v-if="$vuetify.display.smAndUp"
 					>
 						<span class="subtitle-2 users">
-							{{ room.users }} <v-icon small>mdi-account-multiple</v-icon>
+							{{ room.users }} <v-icon small :icon="mdiAccountMultiple" />
 						</span>
 					</v-img>
 					<v-card-title>
@@ -40,10 +40,7 @@
 							{{ $t("room-list.no-description") }}
 						</div>
 
-						<div
-							class="video-title"
-							v-if="room.currentSource && room.currentSource.title"
-						>
+						<div class="video-title" v-if="room.currentSource?.title">
 							{{ room.currentSource.title }}
 						</div>
 						<div class="video-title empty" v-else>
@@ -56,42 +53,28 @@
 	</v-container>
 </template>
 
-<script lang="ts">
+<script lang="ts" setup>
+import { mdiAccountMultiple } from "@mdi/js";
 import { API } from "@/common-http";
-import { defineComponent, ref, onMounted } from "vue";
+import { ref, onMounted } from "vue";
 import { createRoomHelper } from "@/util/roomcreator";
 import { useStore } from "@/store";
 import placeholderUrl from "@/assets/placeholder.svg";
 
-const RoomListView = defineComponent({
-	name: "RoomListView",
-	setup() {
-		const isLoading = ref(false);
-		const rooms = ref([]);
-		const store = useStore();
+const isLoading = ref(false);
+const rooms = ref([]);
+const store = useStore();
 
-		onMounted(async () => {
-			isLoading.value = true;
-			const result = await API.get("/room/list");
-			isLoading.value = false;
-			rooms.value = result.data;
-		});
-
-		async function createRoom() {
-			await createRoomHelper(store);
-		}
-
-		return {
-			isLoading,
-			rooms,
-
-			createRoom,
-			placeholderUrl,
-		};
-	},
+onMounted(async () => {
+	isLoading.value = true;
+	const result = await API.get("/room/list");
+	isLoading.value = false;
+	rooms.value = result.data;
 });
 
-export default RoomListView;
+async function createRoom() {
+	await createRoomHelper(store);
+}
 </script>
 
 <style lang="scss" scoped>

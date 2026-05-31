@@ -1,22 +1,22 @@
-import { URL } from "url";
-import axios, { AxiosResponse } from "axios";
+import { URL } from "node:url";
+import axios, { type AxiosResponse } from "axios";
 import _ from "lodash";
-import { RedisClientType } from "redis";
-import { ServiceAdapter, VideoRequest } from "../serviceadapter";
+import type { RedisClientType } from "redis";
+import { ServiceAdapter, type VideoRequest } from "../serviceadapter.js";
 import {
 	BadApiArgumentException,
 	InvalidVideoIdException,
 	OutOfQuotaException,
 	UnsupportedVideoType,
 	VideoNotFoundException,
-} from "../exceptions";
-import { getLogger } from "../logger";
-import { Video, VideoId, VideoMetadata } from "ott-common/models/video";
-import storage from "../storage";
-import { OttException } from "ott-common/exceptions";
-import { conf } from "../ott-config";
-import { parseIso8601Duration } from "./parsing/iso8601";
-import { BulkVideoResult } from "server/infoextractor";
+} from "../exceptions.js";
+import { getLogger } from "../logger.js";
+import type { Video, VideoId, VideoMetadata } from "ott-common/models/video.js";
+import storage from "../storage.js";
+import { OttException } from "ott-common/exceptions.js";
+import { conf } from "../ott-config.js";
+import { parseIso8601Duration } from "./parsing/iso8601.js";
+import type { BulkVideoResult } from "server/infoextractor.js";
 
 const log = getLogger("youtube");
 
@@ -24,6 +24,13 @@ const knownPrivateLists = ["LL", "WL"];
 
 const ADD_PREVIEW_PLAYLIST_RESULTS_COUNT = conf.get("add_preview.playlist_results_count");
 const ADD_PREVIEW_SEARCH_RESULTS_COUNT = conf.get("add_preview.search.results_count");
+const YOUTUBE_VIDEO_ID_REGEX = /^[A-Za-z0-9_-]+$/;
+const YOUTUBE_LENGTH_FALLBACK_REGEXES = [
+	/length_seconds":"\d+/,
+	/lengthSeconds\\":\\"\d+/,
+	/lengthSeconds":"\d+/,
+];
+const YOUTUBE_EXTERNAL_ID_REGEX = /externalId":"UC[A-Za-z0-9_-]{22}/;
 
 interface YoutubeChannelData {
 	channel?: string;
@@ -126,7 +133,7 @@ export interface YoutubeErrorResponse {
 export type YoutubeApiPart = "id" | "snippet" | "contentDetails" | "status" | "statistics";
 
 function isYoutubeApiError(
-	response: AxiosResponse<any>
+	response: AxiosResponse<any>,
 ): response is AxiosResponse<YoutubeErrorResponse> {
 	return "error" in response.data;
 }
@@ -178,7 +185,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 
 	isCollectionURL(link: string): boolean {
 		const url = new URL(link);
-		let qList = url.searchParams.get("list");
+		const qList = url.searchParams.get("list");
 		return (
 			url.pathname.startsWith("/channel/") ||
 			url.pathname.startsWith("/c/") ||
@@ -194,7 +201,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 		if (url.host.endsWith("youtu.be")) {
 			return url.pathname.replace("/", "").trim();
 		} else if (url.pathname.startsWith("/watch")) {
-			let videoId = url.searchParams.get("v");
+			const videoId = url.searchParams.get("v");
 			if (!videoId) {
 				throw new BadApiArgumentException("input", "No video ID found in URL");
 			}
@@ -206,7 +213,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 
 	async resolveURL(
 		link: string,
-		onlyProperties?: (keyof VideoMetadata)[]
+		onlyProperties?: (keyof VideoMetadata)[],
 	): Promise<BulkVideoResult> {
 		log.debug(`resolveURL: ${link}, ${onlyProperties ? onlyProperties.toString() : ""}`);
 		const url = new URL(link);
@@ -247,7 +254,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 	}
 
 	async fetchVideoInfo(id: string, onlyProperties?: (keyof VideoMetadata)[]): Promise<Video> {
-		let result = await this.videoApiRequest([id], onlyProperties);
+		const result = await this.videoApiRequest([id], onlyProperties);
 		if (result.length === 0) {
 			throw new VideoNotFoundException();
 		}
@@ -257,11 +264,11 @@ export default class YouTubeAdapter extends ServiceAdapter {
 
 	async fetchManyVideoInfo(requests: VideoRequest[]): Promise<Video[]> {
 		const groupedByMissingInfo = _.groupBy(requests, request => request.missingInfo);
-		let results: Video[] = [];
-		for (let group of Object.values(groupedByMissingInfo)) {
+		const results: Video[] = [];
+		for (const group of Object.values(groupedByMissingInfo)) {
 			const ids = group.map(request => request.id);
 			try {
-				let result = await this.videoApiRequest(ids, group[0].missingInfo);
+				const result = await this.videoApiRequest(ids, group[0].missingInfo);
 				// @ts-expect-error this was fine before
 				results.push(...result);
 			} catch (e) {
@@ -296,6 +303,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 					key: this.apiKey,
 					part: "contentDetails",
 					[channelIdProp]: channelIdValue,
+					fields: "items(id,contentDetails(relatedPlaylists(uploads)))",
 				},
 			});
 
@@ -305,7 +313,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 					...channelData,
 					channel: res.data.items[0].id,
 				},
-				uploadsPlaylistId
+				uploadsPlaylistId,
 			);
 
 			return this.fetchPlaylistVideos(uploadsPlaylistId);
@@ -316,7 +324,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			} else {
 				if (err instanceof Error) {
 					log.error(
-						`Error when getting channel upload playlist ID: ${err.message} ${err.stack}`
+						`Error when getting channel upload playlist ID: ${err.message} ${err.stack}`,
 					);
 				}
 				throw err;
@@ -332,8 +340,8 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			"handle",
 		];
 		let idKey: keyof YoutubeChannelData | undefined;
-		for (let key of possibleKeys) {
-			if (Object.prototype.hasOwnProperty.call(channelData, key)) {
+		for (const key of possibleKeys) {
+			if (Object.hasOwn(channelData, key)) {
 				idKey = key;
 				break;
 			}
@@ -347,7 +355,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 		const redisKey = `ytchannel:${idKey}:${idValue}`;
 		log.debug(`grabbing channel playlist id from cache: ${redisKey}`);
 
-		let result = await this.redisClient.get(redisKey);
+		const result = await this.redisClient.get(redisKey);
 		log.debug(`got channel playlist id from cache: ${result}`);
 
 		return result;
@@ -360,8 +368,8 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			"user",
 			"handle",
 		];
-		for (let key of possibleKeys) {
-			if (Object.prototype.hasOwnProperty.call(channelData, key)) {
+		for (const key of possibleKeys) {
+			if (Object.hasOwn(channelData, key)) {
 				const idValue = channelData[key];
 				const redisKey = `ytchannel:${key}:${idValue}`;
 				log.info(`caching channel playlist id: ${redisKey}`);
@@ -378,6 +386,11 @@ export default class YouTubeAdapter extends ServiceAdapter {
 					part: "snippet,status",
 					playlistId: playlistId,
 					maxResults: ADD_PREVIEW_PLAYLIST_RESULTS_COUNT,
+					fields:
+						"items(" +
+						"status(privacyStatus)," +
+						"snippet(resourceId(videoId),title,description,thumbnails(default(url),medium(url)))" +
+						")",
 				},
 			});
 
@@ -440,14 +453,14 @@ export default class YouTubeAdapter extends ServiceAdapter {
 
 	async videoApiRequest(
 		ids: string | string[],
-		onlyProperties?: (keyof VideoMetadata)[]
+		onlyProperties?: (keyof VideoMetadata)[],
 	): Promise<Partial<Video>[]> {
 		if (!Array.isArray(ids)) {
 			ids = [ids];
 		}
 
 		for (const id of ids) {
-			if (!/^[A-Za-z0-9_-]+$/.exec(id)) {
+			if (!YOUTUBE_VIDEO_ID_REGEX.exec(id)) {
 				throw new InvalidVideoIdException(this.serviceId, id);
 			}
 		}
@@ -460,6 +473,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 					key: this.apiKey,
 					part: parts.join(","),
 					id: ids.join(","),
+					fields: this.getNeededFields(parts),
 				},
 			});
 			const results: Video[] = [];
@@ -467,7 +481,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			for (const item of res.data.items) {
 				if (item.snippet && item.snippet.liveBroadcastContent !== "none") {
 					log.debug(
-						`found liveBroadcastContent=${item.snippet.liveBroadcastContent}, skipping`
+						`found liveBroadcastContent=${item.snippet.liveBroadcastContent}, skipping`,
 					);
 					foundLivestream = true;
 					continue;
@@ -482,7 +496,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			} catch (err) {
 				if (err instanceof Error) {
 					log.error(
-						`Failed to cache video info, will return metadata anyway: ${err.message} ${err.stack}`
+						`Failed to cache video info, will return metadata anyway: ${err.message} ${err.stack}`,
 					);
 				} else {
 					log.error(`Failed to cache video info, will return metadata anyway`);
@@ -493,6 +507,9 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			if (axios.isAxiosError(err)) {
 				if (err.response && isYoutubeApiError(err.response)) {
 					if (err.response.status === 403) {
+						log.error(
+							`Youtube API request failed: ${err.response.data.error.code} ${err.response.data.error.message}`,
+						);
 						if (!onlyProperties || onlyProperties.includes("length")) {
 							log.warn(`Attempting youtube fallback method for ${ids.length} videos`);
 							try {
@@ -502,7 +519,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 							} catch (err) {
 								if (err instanceof Error) {
 									log.error(
-										`Youtube fallback failed ${err.message} ${err.stack}`
+										`Youtube fallback failed ${err.message} ${err.stack}`,
 									);
 								} else {
 									log.error(`Youtube fallback failed, but threw non Error`);
@@ -517,7 +534,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 						log.error(
 							`videoApiRequest failed: http status ${
 								err.response.status
-							}, response: ${JSON.stringify(err.response.data)}`
+							}, response: ${JSON.stringify(err.response.data)}`,
 						);
 						throw err;
 					}
@@ -530,6 +547,25 @@ export default class YouTubeAdapter extends ServiceAdapter {
 		}
 	}
 
+	private getNeededFields(parts: YoutubeApiPart[]): string {
+		const needsSnippet = parts.includes("snippet");
+		const needsContentDetails = parts.includes("contentDetails");
+		const fields: string[] = ["items("];
+		fields.push("id");
+		if (needsSnippet) {
+			// Only fields actually used by parseVideoItem() and livestream check
+			fields.push(
+				",snippet(title,description,thumbnails(default(url),medium(url)),liveBroadcastContent)",
+			);
+		}
+		if (needsContentDetails) {
+			// Only duration is used (ISO8601)
+			fields.push(",contentDetails(duration)");
+		}
+		fields.push(")");
+		return fields.join("");
+	}
+
 	private parseVideoItem(item: YoutubeApiVideo) {
 		const video: Video = {
 			service: this.serviceId,
@@ -539,7 +575,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			video.title = item.snippet.title;
 			const truncDescription = conf.get("info_extractor.youtube.truncate_description");
 			if (truncDescription && item.snippet.description.length > truncDescription) {
-				video.description = item.snippet.description.substring(0, truncDescription) + "...";
+				video.description = `${item.snippet.description.substring(0, truncDescription)}...`;
 			} else {
 				video.description = item.snippet.description;
 			}
@@ -558,7 +594,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 				log.error(
 					`Failed to parse video length for ${item.id}. input: "${
 						item.contentDetails.duration
-					}" (type ${typeof item.contentDetails.duration})`
+					}" (type ${typeof item.contentDetails.duration})`,
 				);
 				throw e;
 			}
@@ -577,14 +613,14 @@ export default class YouTubeAdapter extends ServiceAdapter {
 					length,
 					// HACK: we can guess what the thumbnail url is, but this could possibly change without warning
 					thumbnail: `https://i.ytimg.com/vi/${id}/default.jpg`,
-				} as Video)
+				}) as Video,
 		);
 		try {
 			await storage.updateManyVideoInfo(videos);
 		} catch (err) {
 			if (err instanceof Error) {
 				log.error(
-					`Failed to cache video info, returning result anyway: ${err.message} ${err.stack}`
+					`Failed to cache video info, returning result anyway: ${err.message} ${err.stack}`,
 				);
 			}
 		}
@@ -607,7 +643,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 
 			if (parts.length === 0) {
 				log.error(
-					`onlyProperties must have valid values or be null! Found ${onlyProperties.toString()}`
+					`onlyProperties must have valid values or be null! Found ${onlyProperties.toString()}`,
 				);
 				throw new Error("onlyProperties must have valid values or be null!");
 			}
@@ -620,7 +656,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 	async getVideoLengthFallback(id: string): Promise<number | undefined> {
 		const url = `https://youtube.com/watch?v=${id}`;
 		const res = await this.fallbackApi.get(url);
-		const regexs = [/length_seconds":"\d+/, /lengthSeconds\\":\\"\d+/, /lengthSeconds":"\d+/];
+		const regexs = YOUTUBE_LENGTH_FALLBACK_REGEXES;
 		for (let r = 0; r < regexs.length; r++) {
 			const matches = res.data.match(regexs[r]);
 			if (matches === null) {
@@ -666,6 +702,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 			videoSyndicated: true,
 			q: query,
 			eventType: "none",
+			fields: "items(id(videoId))",
 		};
 
 		try {
@@ -688,7 +725,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 	 * Hacky workaround for #285. Feature was requested here: https://issuetracker.google.com/issues/165676622
 	 */
 	async getChannelIdFromYoutubeCustomOrHandleUrl(
-		channelData: YoutubeChannelData
+		channelData: YoutubeChannelData,
 	): Promise<string | undefined> {
 		let res: AxiosResponse<any, any>;
 		if (channelData.handle) {
@@ -700,8 +737,7 @@ export default class YouTubeAdapter extends ServiceAdapter {
 		} else {
 			return undefined;
 		}
-		const regex = /externalId":"UC[A-Za-z0-9_-]{22}/;
-		const matches = res.data.match(regex);
+		const matches = res.data.match(YOUTUBE_EXTERNAL_ID_REGEX);
 		if (matches === null) {
 			return undefined;
 		}

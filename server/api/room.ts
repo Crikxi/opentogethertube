@@ -1,26 +1,26 @@
 import _ from "lodash";
-import { getLogger } from "../logger";
-import roommanager from "../roommanager";
-import { QueueMode, Visibility } from "ott-common/models/types";
-import { consumeRateLimitPoints } from "../rate-limit";
-import { BadApiArgumentException, FeatureDisabledException } from "../exceptions";
-import { OttException } from "ott-common/exceptions";
-import express, { RequestHandler, ErrorRequestHandler } from "express";
-import clientmanager from "../clientmanager";
+import { getLogger } from "../logger.js";
+import roommanager from "../roommanager.js";
+import { Visibility } from "ott-common/models/types.js";
+import { consumeRateLimitPoints } from "../rate-limit.js";
+import { BadApiArgumentException, FeatureDisabledException } from "../exceptions.js";
+import { OttException } from "ott-common/exceptions.js";
+import express, { type RequestHandler, type ErrorRequestHandler } from "express";
+import clientmanager from "../clientmanager.js";
 import {
-	ApplySettingsRequest,
+	type ApplySettingsRequest,
 	RoomRequestType,
-	UndoRequest,
-	AddRequest,
-} from "ott-common/models/messages";
-import storage from "../storage";
-import { Grants } from "ott-common/permissions";
-import { Video } from "ott-common/models/video";
-import { ROOM_NAME_REGEX } from "ott-common/constants";
-import {
+	type UndoRequest,
+	type AddRequest,
+	type UpdateQueueItemRequest,
+} from "ott-common/models/messages.js";
+import storage from "../storage.js";
+import { Grants } from "ott-common/permissions.js";
+import type {
 	OttApiRequestAddToQueue,
 	OttApiRequestPatchRoom,
 	OttApiRequestRemoveFromQueue,
+	OttApiRequestUpdateQueueItem,
 	OttApiRequestRoomCreate,
 	OttApiRequestVote,
 	OttApiResponseGetRoom,
@@ -28,41 +28,27 @@ import {
 	OttApiResponseRoomGenerate,
 	OttResponseBody,
 	OttClaimRequest,
-	OttSettingsRequest,
-} from "ott-common/models/rest-api";
-import { getApiKey } from "../admin";
+	RoomListItem,
+} from "ott-common/models/rest-api.js";
+import { getApiKey } from "../admin.js";
 import { v4 as uuidv4 } from "uuid";
-import { counterHttpErrors } from "../metrics";
-import { conf } from "../ott-config";
+import { counterHttpErrors } from "../metrics.js";
+import { conf } from "../ott-config.js";
 import {
 	OttApiRequestRoomCreateSchema,
 	OttApiRequestVoteSchema,
 	OttApiRequestAddToQueueSchema,
 	OttApiRequestRemoveFromQueueSchema,
+	OttApiRequestUpdateQueueItemSchema,
 	OttApiRequestPatchRoomSchema,
 	OttApiRequestRoomGenerateSchema,
-} from "ott-common/models/zod-schemas";
+} from "ott-common/models/zod-schemas.js";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { UnloadReason } from "../generated";
+import { UnloadReason } from "../generated.js";
 
 const router = express.Router();
 const log = getLogger("api/room");
-
-const VALID_ROOM_VISIBILITY = [Visibility.Public, Visibility.Unlisted, Visibility.Private];
-
-const VALID_ROOM_QUEUE_MODE = [QueueMode.Manual, QueueMode.Vote, QueueMode.Loop, QueueMode.Dj];
-
-export interface RoomListItem {
-	name: string;
-	title: string;
-	description: string;
-	isTemporary: boolean;
-	visibility: Visibility;
-	queueMode: QueueMode;
-	currentSource: Video | null;
-	users: number;
-}
 
 router.get("/list", (req, res) => {
 	const isAuthorized = req.get("apikey") === getApiKey();
@@ -70,7 +56,7 @@ router.get("/list", (req, res) => {
 		log.warn(
 			`Unauthorized request to room list endpoint: ip=${req.ip} forward-ip=${(
 				req.headers["x-forwarded-for"] ?? "not-present"
-			).toString()} user-agent=${req.headers["user-agent"]}`
+			).toString()} user-agent=${req.headers["user-agent"]}`,
 		);
 		res.status(400).json({
 			success: false,
@@ -101,7 +87,7 @@ router.get("/list", (req, res) => {
 
 const generateRoom: RequestHandler<unknown, OttResponseBody<OttApiResponseRoomGenerate>> = async (
 	req,
-	res
+	res,
 ) => {
 	if (!conf.get("room.enable_create_temporary")) {
 		throw new FeatureDisabledException("Temporary rooms are disabled.");
@@ -109,11 +95,11 @@ const generateRoom: RequestHandler<unknown, OttResponseBody<OttApiResponseRoomGe
 
 	const body = OttApiRequestRoomGenerateSchema.parse(req.body);
 
-	let points = 50;
+	const points = 50;
 	if (!(await consumeRateLimitPoints(res, req.ip, points))) {
 		return;
 	}
-	let roomName = uuidv4();
+	const roomName = uuidv4();
 	log.debug(`Generating room: ${roomName}`);
 	await roommanager.createRoom({
 		name: roomName,
@@ -158,7 +144,7 @@ const createRoom: RequestHandler<
 	log.info(
 		`${body.isTemporary ? "Temporary" : "Permanent"} room created: name=${body.name} ip=${
 			req.ip
-		} user-agent=${req.headers["user-agent"]}`
+		} user-agent=${req.headers["user-agent"]}`,
 	);
 	res.status(201).json({
 		success: true,
@@ -167,7 +153,7 @@ const createRoom: RequestHandler<
 
 const getRoom: RequestHandler<{ name: string }, OttApiResponseGetRoom, unknown> = async (
 	req,
-	res
+	res,
 ) => {
 	const room = (await roommanager.getRoom(req.params.name)).unwrap();
 	const resp: OttApiResponseGetRoom = {
@@ -184,7 +170,7 @@ const getRoom: RequestHandler<{ name: string }, OttApiResponseGetRoom, unknown> 
 				"autoSkipSegmentCategories",
 				"restoreQueueBehavior",
 				"enableVoteSkip",
-			])
+			]),
 		),
 		queue: room.queue.items,
 		hasOwner: !!room.owner,
@@ -198,7 +184,7 @@ function isClaimRequest(request: OttApiRequestPatchRoom): request is OttClaimReq
 
 const patchRoom: RequestHandler<{ name: string }, unknown, OttApiRequestPatchRoom> = async (
 	req,
-	res
+	res,
 ) => {
 	const body = OttApiRequestPatchRoomSchema.parse(req.body);
 
@@ -223,7 +209,7 @@ const patchRoom: RequestHandler<{ name: string }, unknown, OttApiRequestPatchRoo
 				room.owner = req.user;
 				// HACK: force the room to send the updated user info to the client
 				for (const user of room.realusers) {
-					if (user.user_id === room.owner.id) {
+					if (user.user_id === room.owner?.id) {
 						room.syncUser(room.getUserInfo(user.id));
 						break;
 					}
@@ -272,12 +258,90 @@ const patchRoom: RequestHandler<{ name: string }, unknown, OttApiRequestPatchRoo
 	});
 };
 
-const deleteRoom: RequestHandler<{ name: string }> = async (req, res) => {
+const deleteRoom: RequestHandler<
+	{ name: string },
+	OttResponseBody<unknown>,
+	unknown,
+	{ permanent?: string }
+> = async (req, res) => {
+	// If permanent=true, allow the room owner to permanently delete their own room (DB + unload)
+	const permanent = req.query.permanent === "true";
+
+	if (permanent) {
+		// Must be logged in
+		if (!req.user) {
+			res.status(401).json({
+				success: false,
+				error: {
+					name: "Unauthorized",
+					message: "Must be logged in to permanently delete a room.",
+				},
+			});
+			return;
+		}
+
+		// Load the room (loads from storage if needed) to validate ownership
+		const room = (await roommanager.getRoom(req.params.name)).unwrap();
+
+		// Only permanent rooms can be permanently deleted
+		if (room.isTemporary) {
+			res.status(400).json({
+				success: false,
+				error: {
+					name: "BadApiArgumentException",
+					message: "Temporary rooms cannot be permanently deleted.",
+				},
+			});
+			return;
+		}
+
+		// Only the owner can permanently delete
+		if (!room.owner || room.owner.id !== req.user.id) {
+			res.status(403).json({
+				success: false,
+				error: {
+					name: "PermissionDeniedException",
+					message: "Only the owner can permanently delete this room.",
+				},
+			});
+			return;
+		}
+
+		// Unload and delete from storage
+		await roommanager.unloadRoom(req.params.name, UnloadReason.Admin);
+		try {
+			await storage.deleteRoom(req.params.name);
+		} catch (err) {
+			if (err instanceof Error) {
+				log.error(`Failed to delete room from storage: ${err.message} ${err.stack}`);
+			} else {
+				log.error(`Failed to delete room from storage`);
+			}
+			res.status(500).json({
+				success: false,
+				error: {
+					name: "Unknown",
+					message: "Failed to delete room from storage.",
+				},
+			});
+			return;
+		}
+
+		res.json({
+			success: true,
+		});
+		return;
+	}
+
+	// If not permanent deletion, require admin apikey to unload a room
 	const isAuthorized = req.get("apikey") === getApiKey();
 	if (!isAuthorized) {
 		res.status(400).json({
 			success: false,
-			error: "apikey is required",
+			error: {
+				name: "Unauthorized",
+				message: "Admin apikey is required to unload a room.",
+			},
 		});
 		return;
 	}
@@ -323,7 +387,7 @@ const addVote: RequestHandler<{ name: string }, unknown, OttApiRequestVote> = as
 
 const removeVote: RequestHandler<{ name: string }, unknown, OttApiRequestVote> = async (
 	req,
-	res
+	res,
 ) => {
 	const body = OttApiRequestVoteSchema.parse(req.body);
 
@@ -374,6 +438,7 @@ const addToQueue: RequestHandler<
 			video: {
 				service: body.service,
 				id: body.id,
+				subtitleUrl: "subtitleUrl" in body ? body.subtitleUrl : undefined,
 			},
 		};
 	}
@@ -390,7 +455,7 @@ const removeFromQueue: RequestHandler<
 	OttApiRequestRemoveFromQueue
 > = async (req, res) => {
 	const body = OttApiRequestRemoveFromQueueSchema.parse(req.body);
-	let points = 5;
+	const points = 5;
 	if (!(await consumeRateLimitPoints(res, req.ip, points))) {
 		return;
 	}
@@ -401,8 +466,30 @@ const removeFromQueue: RequestHandler<
 			type: RoomRequestType.RemoveRequest,
 			video: { service: body.service, id: body.id },
 		},
-		{ token: req.token! }
+		{ token: req.token! },
 	);
+	res.json({
+		success: true,
+	});
+};
+
+const updateQueueItem: RequestHandler<
+	{ name: string },
+	OttResponseBody<unknown>,
+	OttApiRequestUpdateQueueItem
+> = async (req, res) => {
+	const body = OttApiRequestUpdateQueueItemSchema.parse(req.body);
+	const points = 5;
+	if (!(await consumeRateLimitPoints(res, req.ip, points))) {
+		return;
+	}
+	const room = (await roommanager.getRoom(req.params.name)).unwrap();
+	const roomRequest: UpdateQueueItemRequest = {
+		type: RoomRequestType.UpdateQueueItemRequest,
+		video: { service: body.service, id: body.id },
+		update: { subtitleUrl: body.subtitleUrl },
+	};
+	await room.processUnauthorizedRequest(roomRequest, { token: req.token! });
 	res.json({
 		success: true,
 	});
@@ -446,6 +533,7 @@ const errorHandler: ErrorRequestHandler = (err: Error, req, res) => {
 				},
 			});
 		} else if (err.name === "FeatureDisabledException") {
+			// biome-ignore lint/correctness/noUnusedVariables: biome migration
 			const e = err as FeatureDisabledException;
 			res.status(403).json({
 				success: false,
@@ -553,6 +641,14 @@ router.delete("/:name/vote", async (req, res, next) => {
 router.post("/:name/queue", async (req, res, next) => {
 	try {
 		await addToQueue(req, res, next);
+	} catch (e) {
+		errorHandler(e, req, res, next);
+	}
+});
+
+router.patch("/:name/queue", async (req, res, next) => {
+	try {
+		await updateQueueItem(req, res, next);
 	} catch (e) {
 		errorHandler(e, req, res, next);
 	}
